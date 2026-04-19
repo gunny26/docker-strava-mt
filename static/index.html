@@ -4,44 +4,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Strava Multi-Track Analyzer</title>
-    
     <link rel="icon" type="image/png" href="/static/favicon.png">
-    
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
     <style>
         :root { --strava-orange: #fc4c02; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: #f0f2f5; }
-        
-        header { 
-            background: white; padding: 10px 20px; display: flex; align-items: center; gap: 15px;
-            border-bottom: 2px solid var(--strava-orange); box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        header img { height: 40px; border-radius: 8px; }
-        header h1 { margin: 0; font-size: 1.2rem; color: #333; }
-
-        #map { height: 400px; width: 100%; border-bottom: 2px solid #ccc; z-index: 1; }
-        
-        .controls-panel { padding: 15px; background: white; border-bottom: 1px solid #ddd; }
-        .playback-bar { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
-        
-        input, select, button { padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: #f0f2f5; color: #333; overflow: hidden; }
+        header { background: white; padding: 8px 20px; display: flex; align-items: center; gap: 15px; border-bottom: 2px solid var(--strava-orange); box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex-shrink: 0; }
+        header img { height: 35px; border-radius: 6px; }
+        header h1 { margin: 0; font-size: 1.1rem; }
+        #map { height: 32vh; width: 100%; border-bottom: 1px solid #ccc; z-index: 1; flex-shrink: 0; }
+        .controls-panel { padding: 10px 20px; background: white; border-bottom: 1px solid #ddd; flex-shrink: 0; }
+        .playback-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+        input, select, button { padding: 6px; border-radius: 4px; border: 1px solid #ccc; font-size: 0.9rem; }
         button { background: var(--strava-orange); color: white; border: none; font-weight: bold; cursor: pointer; }
-        button:hover { background: #e34402; }
-        button.remove-btn { background: #dc3545; padding: 2px 8px; margin-left: 10px; }
-
-        .track-list { display: flex; gap: 10px; flex-wrap: wrap; }
-        .track-badge { 
-            background: #f8f9fa; padding: 8px 12px; border-radius: 20px; border: 1px solid #ddd;
-            display: flex; align-items: center; font-size: 0.85rem;
-        }
-
-        .charts-area { flex: 1; padding: 20px; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .chart-box { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); min-height: 250px; }
-        
+        .track-list { display: flex; gap: 8px; flex-wrap: wrap; }
+        .track-badge { background: #f8f9fa; padding: 5px 12px; border-radius: 15px; border: 1px solid #ddd; display: flex; align-items: center; font-size: 0.8rem; gap: 8px; }
+        .track-link { text-decoration: none; color: #007fb2; font-weight: bold; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .offset-group { display: flex; align-items: center; gap: 4px; border-left: 1px solid #ddd; padding-left: 8px; }
+        .charts-area { flex-grow: 1; padding: 10px 20px; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .chart-box { background: white; padding: 10px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); height: 180px; position: relative; }
+        footer { background: #333; color: #ccc; padding: 8px 20px; font-size: 0.7rem; text-align: center; flex-shrink: 0; }
         #globalTimeSlider { flex: 1; }
+        .remove-btn { background: #666; padding: 0px 6px; font-size: 0.7rem; }
+        .locked-indicator { color: var(--strava-orange); font-weight: bold; font-size: 0.7rem; margin-left: 5px; display: none; }
     </style>
 </head>
 <body>
@@ -56,20 +43,14 @@
 <div class="controls-panel">
     <div class="playback-bar">
         <button id="loginBtn" onclick="location.href='/login'">Connect Strava</button>
-        <input type="text" id="activityIdInput" placeholder="Enter Activity ID">
-        <button onclick="fetchTrack()">Add Track</button>
-        
-        <div style="width: 2px; height: 25px; background: #eee; margin: 0 10px;"></div>
-        
+        <input type="text" id="activityIdInput" placeholder="Activity ID">
+        <button onclick="fetchTrack()">Add</button>
+        <div style="width: 1px; height: 20px; background: #ddd;"></div>
         <button id="playBtn">Play</button>
-        <select id="speedMultiplier">
-            <option value="1">1x</option>
-            <option value="5" selected>5x</option>
-            <option value="10">10x</option>
-            <option value="50">50x</option>
-        </select>
+        <select id="speedMultiplier"><option value="1">1x</option><option value="5" selected>5x</option><option value="10">10x</option><option value="25">25x</option></select>
         <input type="range" id="globalTimeSlider" min="0" max="0" value="0">
         <span id="timeDisplay">00:00</span>
+        <span id="lockStatus" class="locked-indicator">FIXED</span>
     </div>
     <div class="track-list" id="trackList"></div>
 </div>
@@ -81,12 +62,18 @@
     <div class="chart-box"><canvas id="speedChart"></canvas></div>
 </div>
 
+<footer>
+    <div>&copy; 2026 Strava Multi-Track Analyzer | <a href="#" style="color:white">Impressum</a> | This app is for amateur analysis only.</div>
+</footer>
+
 <script>
     let tracks = [];
     let isPlaying = false;
+    let isLocked = false;
     let globalTime = 0;
     let maxDuration = 0;
-    const PALETTE = ['#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6', '#fabed4'];
+    let hoverTime = null;
+    const PALETTE = ['#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6', '#000075'];
     let colorIdx = 0;
 
     const urlParams = new URLSearchParams(window.location.hash.replace('#', '?'));
@@ -96,41 +83,58 @@
     const map = L.map('map').setView([47.26, 11.40], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    // Chart logic with crosshair plugin
-    const crosshairLine = {
-        id: 'crosshairLine',
+    // Plugin for Synchronized Vertical Line
+    const syncLinePlugin = {
+        id: 'syncLine',
         afterDraw: (chart) => {
-            if (chart.tooltip?._active?.length) {
-                let x = chart.tooltip._active[0].element.x;
-                let yAxis = chart.scales.y;
-                let ctx = chart.ctx;
-                ctx.save();
-                ctx.beginPath();
-                ctx.moveTo(x, yAxis.top);
-                ctx.lineTo(x, yAxis.bottom);
-                ctx.lineWidth = 1;
-                ctx.strokeStyle = '#666';
-                ctx.setLineDash([5, 5]);
-                ctx.stroke();
-                ctx.restore();
+            const activeTime = isLocked ? globalTime : hoverTime;
+            if (activeTime !== null) {
+                const ctx = chart.ctx;
+                const xAxis = chart.scales.x;
+                const yAxis = chart.scales.y;
+                const xPixel = xAxis.getPixelForValue(activeTime);
+                
+                if (xPixel >= xAxis.left && xPixel <= xAxis.right) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.setLineDash([5, 5]);
+                    ctx.moveTo(xPixel, yAxis.top);
+                    ctx.lineTo(xPixel, yAxis.bottom);
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeStyle = isLocked ? '#fc4c02' : 'rgba(0,0,0,0.4)';
+                    ctx.stroke();
+                    ctx.restore();
+                }
             }
         }
     };
 
-    function createChart(id, label) {
+    function createChart(id, title) {
         return new Chart(document.getElementById(id), {
             type: 'line',
             data: { datasets: [] },
-            plugins: [crosshairLine],
+            plugins: [syncLinePlugin],
             options: {
                 responsive: true, maintainAspectRatio: false, animation: false,
-                plugins: { title: { display: true, text: label }, legend: { display: false } },
-                scales: { x: { type: 'linear' } },
-                onHover: (e, el) => {
+                plugins: { title: { display: true, text: title, font: {size: 11} }, legend: { display: false }, tooltip: { enabled: false } },
+                scales: { x: { type: 'linear', ticks: { display: false } }, y: { ticks: { font: {size: 9} } } },
+                onHover: (e, el, chart) => {
+                    if (isLocked || isPlaying) return;
                     if (el.length) {
-                        const xValue = el[0].element.x;
-                        const dataValue = chartInstance.scales.x.getValueForPixel(xValue);
-                        syncFromChart(dataValue);
+                        hoverTime = chart.scales.x.getValueForPixel(el[0].element.x);
+                        syncGlobal(hoverTime);
+                    } else {
+                        hoverTime = null;
+                        syncGlobal(globalTime);
+                    }
+                },
+                onClick: (e, el, chart) => {
+                    if (isPlaying) isPlaying = false; // Stop playback on click
+                    isLocked = !isLocked;
+                    document.getElementById('lockStatus').style.display = isLocked ? 'inline' : 'none';
+                    if (el.length) {
+                        globalTime = chart.scales.x.getValueForPixel(el[0].element.x);
+                        syncGlobal(globalTime);
                     }
                 }
             }
@@ -143,9 +147,14 @@
     const speedChart = createChart('speedChart', 'Speed (m/s)');
     const allCharts = [altitudeChart, cadenceChart, hrChart, speedChart];
 
-    function syncFromChart(time) {
-        globalTime = time;
-        updateUI();
+    function syncGlobal(time) {
+        tracks.forEach(t => {
+            const pos = getInterpolated(t.stream, 'latlng', time + t.offset);
+            if (pos) t.marker.setLatLng(pos);
+        });
+        document.getElementById('globalTimeSlider').value = time;
+        document.getElementById('timeDisplay').innerText = new Date(time * 1000).toISOString().substr(14, 5);
+        allCharts.forEach(c => c.draw());
     }
 
     function getInterpolated(stream, type, t) {
@@ -154,10 +163,7 @@
         for (let i = 0; i < times.length - 1; i++) {
             if (t >= times[i] && t <= times[i+1]) {
                 const r = (t - times[i]) / (times[i+1] - times[i]);
-                if (type === 'latlng') return [
-                    vals[i][0] + r * (vals[i+1][0] - vals[i][0]),
-                    vals[i][1] + r * (vals[i+1][1] - vals[i][1])
-                ];
+                if (type === 'latlng') return [vals[i][0] + r*(vals[i+1][0]-vals[i][0]), vals[i][1] + r*(vals[i+1][1]-vals[i][1])];
                 return vals[i] + r * (vals[i+1] - vals[i]);
             }
         }
@@ -168,41 +174,35 @@
         const id = document.getElementById('activityIdInput').value;
         if (!id || !stravaToken) return;
         try {
-            const [sRes, iRes] = await Promise.all([
-                fetch(`/stream/${id}?token=${stravaToken}`),
-                fetch(`/activity-info/${id}?token=${stravaToken}`)
-            ]);
-            addTrackToUI(await iRes.json(), await sRes.json(), id);
+            const [sRes, iRes] = await Promise.all([fetch(`/stream/${id}?token=${stravaToken}`), fetch(`/activity-info/${id}?token=${stravaToken}`)]);
+            const stream = await sRes.json();
+            const info = await iRes.json();
+            const color = PALETTE[colorIdx++ % PALETTE.length];
+            const marker = L.circleMarker([0,0], { color: 'white', fillColor: color, fillOpacity: 1, radius: 7, weight: 2 }).addTo(map);
+            const poly = L.polyline(stream.latlng.data, { color, weight: 3, opacity: 0.5 }).addTo(map);
+            tracks.push({ id, name: info.name, stream, color, marker, poly, offset: 0 });
+            maxDuration = Math.max(maxDuration, ...stream.time.data);
+            document.getElementById('globalTimeSlider').max = maxDuration;
+            renderTrackBadge(id, info.name, color);
+            updateCharts();
+            map.fitBounds(poly.getBounds());
         } catch (e) { console.error(e); }
     }
 
-    function addTrackToUI(info, stream, id) {
-        const color = PALETTE[colorIdx++ % PALETTE.length];
-        const marker = L.circleMarker([0,0], { color: 'white', fillColor: color, fillOpacity: 1, radius: 8, weight: 2 }).addTo(map);
-        const poly = L.polyline(stream.latlng.data, { color, weight: 4, opacity: 0.6 }).addTo(map);
-        
-        const track = { id, name: info.name, stream, color, marker, poly, offset: 0 };
-        tracks.push(track);
-        
-        const duration = Math.max(...stream.time.data);
-        if (duration > maxDuration) {
-            maxDuration = duration;
-            document.getElementById('globalTimeSlider').max = maxDuration;
-        }
-
+    function renderTrackBadge(id, name, color) {
         const badge = document.createElement('div');
         badge.className = 'track-badge';
         badge.id = `badge-${id}`;
         badge.innerHTML = `
-            <span style="color:${color}; margin-right:8px">●</span> 
-            ${info.name} 
-            <input type="number" value="0" style="width:50px; margin-left:10px" onchange="updateOffset('${id}', this.value)">
+            <span style="color:${color}">●</span> 
+            <a href="https://www.strava.com/activities/${id}" target="_blank" class="track-link">${name}</a>
+            <div class="offset-group">
+                <span style="font-size: 0.65rem;">Offset:</span>
+                <input type="number" value="0" style="width:40px; padding:1px;" onchange="updateOffset('${id}', this.value)">
+            </div>
             <button class="remove-btn" onclick="removeTrack('${id}')">✕</button>
         `;
         document.getElementById('trackList').appendChild(badge);
-        
-        updateCharts();
-        map.fitBounds(poly.getBounds());
     }
 
     function removeTrack(id) {
@@ -219,23 +219,31 @@
     function updateOffset(id, val) {
         const t = tracks.find(x => x.id === id);
         if (t) t.offset = parseFloat(val);
-        updateUI();
+        updateCharts(); // Redraw charts to shift curves
+        syncGlobal(globalTime);
     }
 
-    function updateUI() {
-        tracks.forEach(t => {
-            const pos = getInterpolated(t.stream, 'latlng', globalTime + t.offset);
-            if (pos) t.marker.setLatLng(pos);
+    function updateCharts() {
+        const ds = (t, key) => ({
+            label: t.name,
+            // Apply OFFSET: Data points move on X-axis
+            data: t.stream.time.data.map((time, i) => ({ x: time - t.offset, y: t.stream[key] ? t.stream[key].data[i] : 0 })),
+            borderColor: t.color, borderWidth: 1.5, pointRadius: 0, tension: 0.1
         });
-        document.getElementById('globalTimeSlider').value = globalTime;
-        document.getElementById('timeDisplay').innerText = new Date(globalTime * 1000).toISOString().substr(14, 5);
+        altitudeChart.data.datasets = tracks.map(t => ds(t, 'altitude'));
+        cadenceChart.data.datasets = tracks.map(t => ds(t, 'cadence'));
+        hrChart.data.datasets = tracks.map(t => ds(t, 'heartrate'));
+        speedChart.data.datasets = tracks.map(t => ds(t, 'velocity_smooth'));
+        allCharts.forEach(c => c.update());
     }
 
     function playLoop() {
         if (!isPlaying) return;
+        isLocked = false;
+        document.getElementById('lockStatus').style.display = 'none';
         globalTime += (0.5 * parseFloat(document.getElementById('speedMultiplier').value));
         if (globalTime > maxDuration) globalTime = 0;
-        updateUI();
+        syncGlobal(globalTime);
         setTimeout(() => requestAnimationFrame(playLoop), 500);
     }
 
@@ -247,21 +255,10 @@
 
     document.getElementById('globalTimeSlider').oninput = (e) => {
         globalTime = parseFloat(e.target.value);
-        updateUI();
+        isLocked = false; 
+        document.getElementById('lockStatus').style.display = 'none';
+        syncGlobal(globalTime);
     };
-
-    function updateCharts() {
-        const ds = (t, key) => ({
-            label: t.name,
-            data: t.stream.time.data.map((time, i) => ({ x: time, y: t.stream[key] ? t.stream[key].data[i] : 0 })),
-            borderColor: t.color, borderWidth: 2, pointRadius: 0, tension: 0.1
-        });
-        altitudeChart.data.datasets = tracks.map(t => ds(t, 'altitude'));
-        cadenceChart.data.datasets = tracks.map(t => ds(t, 'cadence'));
-        hrChart.data.datasets = tracks.map(t => ds(t, 'heartrate'));
-        speedChart.data.datasets = tracks.map(t => ds(t, 'velocity_smooth'));
-        allCharts.forEach(c => c.update());
-    }
 </script>
 </body>
 </html>
