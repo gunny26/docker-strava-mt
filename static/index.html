@@ -30,6 +30,9 @@
 
     <div class="dashboard-controls">
         <div class="playback-bar">
+            <button id="loginBtn" onclick="location.href='/login'">Connect Strava</button>
+            <input type="text" id="activityIdInput" placeholder="Activity ID (e.g. 1234567)">
+            <button onclick="fetchTrack()">Add Track</button>
             <button id="playBtn">Play</button>
             <input type="range" id="globalTimeSlider" min="0" max="0" value="0">
             <span id="timeDisplay">00:00</span>
@@ -77,6 +80,37 @@
             data: { datasets: [] },
             options: { ...chartOptions, plugins: { title: { display: true, text: 'Speed (m/s)' } } }
         });
+
+        // Check for access token in URL on load
+        const urlParams = new URLSearchParams(window.location.hash.replace('#', '?'));
+        let stravaToken = urlParams.get('access_token');
+
+        if (stravaToken) {
+            document.getElementById('loginBtn').innerText = "Strava Connected";
+            document.getElementById('loginBtn').disabled = true;
+        }
+
+        async function fetchTrack() {
+            const id = document.getElementById('activityIdInput').value;
+            if (!id || !stravaToken) {
+                alert("Please connect to Strava and enter an Activity ID");
+                return;
+            }
+
+            try {
+                const response = await fetch(`/stream/${id}?token=${stravaToken}`);
+                const stream = await response.json();
+                
+                // Generate a random color for the track
+                const randomColor = '#' + Math.floor(Math.random()*16777215).toString(16);
+                addTrackToUI(id, stream, randomColor);
+                
+                document.getElementById('activityIdInput').value = '';
+            } catch (error) {
+                console.error("Error fetching stream:", error);
+                alert("Could not fetch activity. Check ID and permissions.");
+            }
+        }
 
         // Function to interpolate between two data points
         function getInterpolatedValue(stream, type, time) {
