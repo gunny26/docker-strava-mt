@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: strava-mt-app
+    restart: always
+    # Loading the environment file
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    # Ensure dependencies are installed or use a pre-built image
