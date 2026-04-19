@@ -55,3 +55,10 @@ async def get_activity_stream(activity_id: str, token: str):
     }
     response = requests.get(url, headers=headers, params=params)
     return response.json()
+
+@app.get("/activity-info/{activity_id}")
+async def get_activity_info(activity_id: str, token: str):
+    headers = {'Authorization': f'Bearer {token}'}
+    url = f"https://www.strava.com/api/v3/activities/{activity_id}"
+    response = requests.get(url, headers=headers)
+    return response.json() # This includes the 'name' of the activity

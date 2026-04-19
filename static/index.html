@@ -3,25 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Strava Multi-Track Analyzer</title>
+    <title>Strava Multi-Track Analyzer - Tirol Edition</title>
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <style>
-        body { font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; }
-        #map { height: 400px; width: 100%; border-bottom: 2px solid #ccc; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: #f4f4f9; }
         
-        .dashboard-controls { padding: 15px; background: #f8f9fa; border-bottom: 1px solid #ddd; }
-        .track-list { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
-        .track-item { padding: 8px; border: 1px solid #ccc; border-radius: 4px; background: white; font-size: 12px; }
+        #map { height: 450px; width: 100%; border-bottom: 3px solid #333; z-index: 1; }
         
-        .chart-container { flex: 1; padding: 20px; overflow-y: auto; }
-        canvas { max-height: 250px; margin-bottom: 30px; }
+        .dashboard-controls { padding: 15px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 10; }
         
-        .playback-bar { display: flex; align-items: center; gap: 20px; margin-bottom: 10px; }
-        #globalTimeSlider { flex: 1; }
+        .playback-bar { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+        .playback-bar input[type="text"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 150px; }
+        .playback-bar button { padding: 8px 15px; cursor: pointer; border: none; border-radius: 4px; background: #fc4c02; color: white; font-weight: bold; }
+        .playback-bar button:hover { background: #e34402; }
+        .playback-bar select { padding: 7px; border-radius: 4px; }
+        
+        #globalTimeSlider { flex: 1; min-width: 200px; }
+        #timeDisplay { font-family: monospace; font-weight: bold; font-size: 1.2em; min-width: 60px; }
+        
+        .track-list { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
+        .track-item { padding: 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; min-width: 200px; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); }
+        .track-item strong { display: block; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .chart-container { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+        .canvas-wrapper { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); min-height: 250px; }
     </style>
 </head>
 <body>
@@ -31,129 +40,154 @@
     <div class="dashboard-controls">
         <div class="playback-bar">
             <button id="loginBtn" onclick="location.href='/login'">Connect Strava</button>
-            <input type="text" id="activityIdInput" placeholder="Activity ID (e.g. 1234567)">
+            <input type="text" id="activityIdInput" placeholder="Activity ID">
             <button onclick="fetchTrack()">Add Track</button>
+            
+            <div style="height: 30px; width: 1px; background: #ccc; margin: 0 10px;"></div>
+            
             <button id="playBtn">Play</button>
+            <select id="speedMultiplier">
+                <option value="1">1x (Realtime)</option>
+                <option value="5" selected>5x</option>
+                <option value="10">10x</option>
+                <option value="20">20x</option>
+                <option value="50">50x</option>
+            </select>
+            
             <input type="range" id="globalTimeSlider" min="0" max="0" value="0">
             <span id="timeDisplay">00:00</span>
         </div>
         
-        <div class="track-list" id="trackList">
-            </div>
+        <div class="track-list" id="trackList"></div>
     </div>
 
     <div class="chart-container">
-        <canvas id="hrChart"></canvas>
-        <canvas id="speedChart"></canvas>
+        <div class="canvas-wrapper"><canvas id="altitudeChart"></canvas></div>
+        <div class="canvas-wrapper"><canvas id="hrChart"></canvas></div>
+        <div class="canvas-wrapper"><canvas id="speedChart"></canvas></div>
     </div>
 
     <script>
-        // Global state management
+        // Global State
         let tracks = [];
         let isPlaying = false;
         let globalTime = 0;
         let maxDuration = 0;
-        let animationFrame;
+        const COLOR_PALETTE = ['#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c'];
+        let colorIndex = 0;
 
-        // Initialize Leaflet map
-        const map = L.map('map').setView([47.26, 11.40], 13);
+        // Check for Strava Token in URL
+        const urlParams = new URLSearchParams(window.location.hash.replace('#', '?'));
+        let stravaToken = urlParams.get('access_token');
+        if (stravaToken) {
+            document.getElementById('loginBtn').innerText = "Strava Connected";
+            document.getElementById('loginBtn').style.background = "#28a745";
+        }
+
+        // Initialize Map
+        const map = L.map('map').setView([47.26, 11.40], 12);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // Initialize Chart.js instances
+        // Chart Setup
         const chartOptions = {
             responsive: true,
             maintainAspectRatio: false,
             animation: false,
-            scales: { x: { type: 'linear', title: { display: true, text: 'Time (seconds)' } } }
+            interaction: { mode: 'index', intersect: false },
+            scales: { x: { type: 'linear', title: { display: true, text: 'Time (sec)' } } }
         };
 
+        const altitudeChart = new Chart(document.getElementById('altitudeChart'), {
+            type: 'line', data: { datasets: [] }, options: { ...chartOptions, plugins: { title: { display: true, text: 'Altitude (m)' } } }
+        });
         const hrChart = new Chart(document.getElementById('hrChart'), {
-            type: 'line',
-            data: { datasets: [] },
-            options: { ...chartOptions, plugins: { title: { display: true, text: 'Heart Rate (bpm)' } } }
+            type: 'line', data: { datasets: [] }, options: { ...chartOptions, plugins: { title: { display: true, text: 'Heart Rate (bpm)' } } }
         });
-
         const speedChart = new Chart(document.getElementById('speedChart'), {
-            type: 'line',
-            data: { datasets: [] },
-            options: { ...chartOptions, plugins: { title: { display: true, text: 'Speed (m/s)' } } }
+            type: 'line', data: { datasets: [] }, options: { ...chartOptions, plugins: { title: { display: true, text: 'Speed (m/s)' } } }
         });
 
-        // Check for access token in URL on load
-        const urlParams = new URLSearchParams(window.location.hash.replace('#', '?'));
-        let stravaToken = urlParams.get('access_token');
-
-        if (stravaToken) {
-            document.getElementById('loginBtn').innerText = "Strava Connected";
-            document.getElementById('loginBtn').disabled = true;
-        }
-
-        async function fetchTrack() {
-            const id = document.getElementById('activityIdInput').value;
-            if (!id || !stravaToken) {
-                alert("Please connect to Strava and enter an Activity ID");
-                return;
-            }
-
-            try {
-                const response = await fetch(`/stream/${id}?token=${stravaToken}`);
-                const stream = await response.json();
-                
-                // Generate a random color for the track
-                const randomColor = '#' + Math.floor(Math.random()*16777215).toString(16);
-                addTrackToUI(id, stream, randomColor);
-                
-                document.getElementById('activityIdInput').value = '';
-            } catch (error) {
-                console.error("Error fetching stream:", error);
-                alert("Could not fetch activity. Check ID and permissions.");
-            }
-        }
-
-        // Function to interpolate between two data points
-        function getInterpolatedValue(stream, type, time) {
+        // Helper: Interpolation
+        function getInterpolated(stream, type, time) {
             const times = stream.time.data;
             const values = stream[type].data;
-
             for (let i = 0; i < times.length - 1; i++) {
                 if (time >= times[i] && time <= times[i+1]) {
-                    const ratio = (time - times[i]) / (times[i+1] - times[i]);
-                    
-                    if (type === 'latlng') {
-                        const lat = values[i][0] + ratio * (values[i+1][0] - values[i][0]);
-                        const lng = values[i][1] + ratio * (values[i+1][1] - values[i][1]);
-                        return [lat, lng];
-                    }
-                    return values[i] + ratio * (values[i+1] - values[i]);
+                    const r = (time - times[i]) / (times[i+1] - times[i]);
+                    if (type === 'latlng') return [
+                        values[i][0] + r * (values[i+1][0] - values[i][0]),
+                        values[i][1] + r * (values[i+1][1] - values[i][1])
+                    ];
+                    return values[i] + r * (values[i+1] - values[i]);
                 }
             }
             return null;
         }
 
-        // Update all markers and chart indicators
-        function updateUI() {
-            tracks.forEach(track => {
-                const adjustedTime = globalTime + track.offset;
-                const pos = getInterpolatedValue(track.stream, 'latlng', adjustedTime);
-                
-                if (pos) {
-                    track.marker.setLatLng(pos);
-                }
-            });
+        async function fetchTrack() {
+            const id = document.getElementById('activityIdInput').value;
+            if (!id || !stravaToken) return alert("Connect Strava & Enter ID");
 
+            try {
+                const [sRes, iRes] = await Promise.all([
+                    fetch(`/stream/${id}?token=${stravaToken}`),
+                    fetch(`/activity-info/${id}?token=${stravaToken}`)
+                ]);
+                const stream = await sRes.json();
+                const info = await iRes.json();
+                
+                addTrackToUI(info.name || `Activity ${id}`, stream, COLOR_PALETTE[colorIndex++ % COLOR_PALETTE.length], id);
+                document.getElementById('activityIdInput').value = '';
+            } catch (e) { alert("Error loading track"); }
+        }
+
+        function addTrackToUI(name, stream, color, id) {
+            const duration = Math.max(...stream.time.data);
+            if (duration > maxDuration) {
+                maxDuration = duration;
+                document.getElementById('globalTimeSlider').max = maxDuration;
+            }
+
+            const marker = L.circleMarker([0,0], { color: color, radius: 7, fillOpacity: 1, weight: 2, color: 'white', fillColor: color }).addTo(map);
+            const path = L.polyline(stream.latlng.data, { color: color, weight: 4, opacity: 0.6 }).addTo(map);
+            
+            const track = { id, name, stream, color, offset: 0, marker };
+            tracks.push(track);
+            map.fitBounds(path.getBounds());
+
+            const div = document.createElement('div');
+            div.className = 'track-item';
+            div.style.borderLeft = `6px solid ${color}`;
+            div.innerHTML = `
+                <strong>${name}</strong>
+                Offset: <input type="number" value="0" style="width:60px" onchange="updateOffset('${id}', this.value)"> s
+            `;
+            document.getElementById('trackList').appendChild(div);
+            updateCharts();
+        }
+
+        function updateOffset(id, val) {
+            const t = tracks.find(x => x.id === id);
+            if (t) t.offset = parseFloat(val);
+            updateUI();
+        }
+
+        function updateUI() {
+            tracks.forEach(t => {
+                const pos = getInterpolated(t.stream, 'latlng', globalTime + t.offset);
+                if (pos) t.marker.setLatLng(pos);
+            });
             document.getElementById('globalTimeSlider').value = globalTime;
             document.getElementById('timeDisplay').innerText = new Date(globalTime * 1000).toISOString().substr(14, 5);
         }
 
-        // Playback loop
         function playLoop() {
             if (!isPlaying) return;
-            
-            globalTime += 0.5; // Half second steps
+            const mult = parseFloat(document.getElementById('speedMultiplier').value);
+            globalTime += (0.5 * mult);
             if (globalTime > maxDuration) globalTime = 0;
-            
             updateUI();
             setTimeout(() => requestAnimationFrame(playLoop), 500);
         }
@@ -169,67 +203,16 @@
             updateUI();
         };
 
-        // Example function to add a track (to be called after fetching Strava data)
-        function addTrackToUI(activityId, stream, color) {
-            const trackDuration = Math.max(...stream.time.data);
-            if (trackDuration > maxDuration) {
-                maxDuration = trackDuration;
-                document.getElementById('globalTimeSlider').max = maxDuration;
-            }
-
-            const marker = L.circleMarker([0,0], { color: color, radius: 6, fillOpacity: 1 }).addTo(map);
-            const polyline = L.polyline(stream.latlng.data, { color: color, weight: 3, opacity: 0.5 }).addTo(map);
-            
-            const trackObj = {
-                id: activityId,
-                stream: stream,
-                color: color,
-                offset: 0,
-                marker: marker
-            };
-
-            tracks.push(trackObj);
-            map.fitBounds(polyline.getBounds());
-
-            // Add offset slider to UI
-            const list = document.getElementById('trackList');
-            const div = document.createElement('div');
-            div.className = 'track-item';
-            div.innerHTML = `
-                <strong style="color:${color}">Track ${activityId}</strong><br>
-                Offset: <input type="number" value="0" style="width:50px" 
-                        onchange="updateTrackOffset('${activityId}', this.value)"> sec
-            `;
-            list.appendChild(div);
-
-            // Update charts
-            updateChartData();
-        }
-
-        function updateTrackOffset(id, value) {
-            const track = tracks.find(t => t.id === id);
-            if (track) track.offset = parseFloat(value);
-            updateUI();
-        }
-
-        function updateChartData() {
-            hrChart.data.datasets = tracks.map(t => ({
-                label: 'HR ' + t.id,
-                data: t.stream.time.data.map((time, i) => ({ x: time, y: t.stream.heartrate.data[i] })),
-                borderColor: t.color,
-                borderWidth: 1,
-                pointRadius: 0
-            }));
-            hrChart.update();
-
-            speedChart.data.datasets = tracks.map(t => ({
-                label: 'Speed ' + t.id,
-                data: t.stream.time.data.map((time, i) => ({ x: time, y: t.stream.velocity_smooth.data[i] })),
-                borderColor: t.color,
-                borderWidth: 1,
-                pointRadius: 0
-            }));
-            speedChart.update();
+        function updateCharts() {
+            const ds = (t, key) => ({
+                label: t.name,
+                data: t.stream.time.data.map((time, i) => ({ x: time, y: t.stream[key].data[i] })),
+                borderColor: t.color, borderWidth: 2, pointRadius: 0, tension: 0.1
+            });
+            altitudeChart.data.datasets = tracks.map(t => ds(t, 'altitude'));
+            hrChart.data.datasets = tracks.map(t => ds(t, 'heartrate'));
+            speedChart.data.datasets = tracks.map(t => ds(t, 'velocity_smooth'));
+            [altitudeChart, hrChart, speedChart].forEach(c => c.update());
         }
     </script>
 </body>
