@@ -50,17 +50,14 @@ You need to create a Strava API Application at [strava.com/settings/api](https:/
     ```
     docker-compose up -d --build
     ```
-    Analyze:
+## Analyze:
 
-        Open http://localhost:8000.
+Open http://localhost:8000.
 
-        Click Connect Strava to authorize.
-
-        Paste a Strava Activity ID into the sidebar and click Add.
-
-        Use the Offset fields to align your runs.
-
-        Click on a graph to lock the position for detailed analysis.
+Click Connect Strava to authorized
+Paste a Strava Activity ID into the sidebar and click Add.
+Use the Offset fields to align your runs.
+Click on a graph to lock the position for detailed analysis.
 
 ## Project Background
 
@@ -68,8 +65,9 @@ I use this application to analyze the best and most efficient routes to specific
 
 ## Credits
 
-    Concept & Idea: gunny26
+Concept & Idea: gunny26
+AI Collaborator: Developed in collaboration with Google Gemini (AI Pair Programming).
 
-    AI Collaborator: Developed in collaboration with Google Gemini (AI Pair Programming).
+## Disclaimer:
 
-## Disclaimer: This app is not affiliated with Strava, Inc. It uses the Strava API in accordance with their terms of service.
+This app is not affiliated with Strava, Inc. It uses the Strava API in accordance with their terms of service.
