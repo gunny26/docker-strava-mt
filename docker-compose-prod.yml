@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  app:
+    image: ghcr.io/dein-github-name/strava-mt-app:latest
+    restart: always
+    env_file: .env
+    # Port 8000 muss nicht nach außen offen sein, HAProxy übernimmt das
+
+  haproxy:
+    image: haproxy:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./haproxy:/usr/local/etc/haproxy:ro
+      - ./certs:/etc/ssl/certs:ro
+    depends_on:
+      - app
