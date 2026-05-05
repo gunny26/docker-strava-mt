@@ -20,11 +20,16 @@
         header img { height: 30px; border-radius: 4px; }
         #loginBtn { background: var(--strava-orange); color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
-        #sidebar { width: var(--sidebar-width); background: white; border-right: 1px solid #ccc; transition: margin-left 0.3s ease; overflow-y: auto; display: flex; flex-direction: column; z-index: 50; }
-        #sidebar.collapsed { margin-left: calc(var(--sidebar-width) * -1); }
+        
+        /* Sidebar on the right */
+        #sidebar { width: var(--sidebar-width); background: white; border-left: 1px solid #ccc; transition: margin-right 0.3s ease; overflow-y: auto; display: flex; flex-direction: column; z-index: 50; margin-right: 0; }
+        #sidebar.collapsed { margin-right: calc(var(--sidebar-width) * -1); }
         .sidebar-content { padding: 15px; display: flex; flex-direction: column; gap: 15px; }
-        .sidebar-toggle { position: absolute; left: var(--sidebar-width); top: 10px; z-index: 1000; background: white; border: 1px solid #ccc; padding: 5px; cursor: pointer; border-radius: 0 4px 4px 0; }
-        #sidebar.collapsed + .sidebar-toggle { left: 0; }
+        
+        /* Toggle button adjusted for right side */
+        .sidebar-toggle { position: absolute; right: var(--sidebar-width); top: 10px; z-index: 1000; background: white; border: 1px solid #ccc; padding: 5px; cursor: pointer; border-radius: 4px 0 0 4px; transition: right 0.3s ease; }
+        #sidebar.collapsed + .sidebar-toggle { right: 0; }
+        
         .track-item { background: #fff; border: 1px solid #ddd; padding: 10px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .content-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
         #map { height: 35vh; width: 100%; border-bottom: 1px solid #ccc; flex-shrink: 0; }
@@ -43,27 +48,10 @@
         <img src="/static/favicon.png" alt="Logo">
         <h1>Strava Multi-Track Analyzer</h1>
     </div>
-    <button id="loginBtn" onclick="location.href='/login'">Connect Strava</button>
+    <button id="loginBtn" onclick="handleLoginToggle()">Strava verbinden</button>
 </header>
 
 <div class="main-container">
-    <div id="sidebar">
-        <div class="sidebar-content">
-            <div style="display:flex; gap:5px;">
-                <input type="text" id="actIdIn" placeholder="Activity ID" style="flex:1">
-                <button class="btn-primary" onclick="fetchTrack()">Add</button>
-            </div>
-            <div id="trackList"></div>
-            <hr>
-            <div style="display:flex; flex-direction:column; gap:8px;">
-                <input type="text" id="setNameIn" placeholder="Set Title">
-                <button class="btn-primary" onclick="saveCurrentSet()">Save Locally</button>
-                <select id="setsSelect" onchange="loadSet(this.value)"><option value="">-- Load Set --</option></select>
-            </div>
-        </div>
-    </div>
-    <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
-
     <div class="content-area">
         <div id="map"></div>
         <div class="playback-panel">
@@ -80,6 +68,23 @@
             <div class="chart-box"><div id="vals-speed" class="value-legend"></div><canvas id="speedChart"></canvas></div>
         </div>
     </div>
+
+    <div id="sidebar">
+        <div class="sidebar-content">
+            <div style="display:flex; gap:5px;">
+                <input type="text" id="actIdIn" placeholder="Activity ID" style="flex:1">
+                <button class="btn-primary" onclick="fetchTrack()">Add</button>
+            </div>
+            <div id="trackList"></div>
+            <hr>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <input type="text" id="setNameIn" placeholder="Set Title">
+                <button class="btn-primary" onclick="saveCurrentSet()">Save Locally</button>
+                <select id="setsSelect" onchange="loadSet(this.value)"><option value="">-- Load Set --</option></select>
+            </div>
+        </div>
+    </div>
+    <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
 </div>
 
 <footer>&copy; 2026 Strava Multi-Track Analyzer | Tyrol Kliniken RZ Edition</footer>
@@ -95,10 +100,26 @@
     const PALETTE = ['#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6', '#000075'];
     let colorIdx = 0;
 
-    // Token Handling
+    // Token Handling & Login Button Logic
     const urlParams = new URLSearchParams(window.location.hash.replace('#', '?'));
     let stravaToken = urlParams.get('access_token');
-    if(stravaToken) document.getElementById('loginBtn').innerText = "Connected";
+    const loginBtn = document.getElementById('loginBtn');
+    
+    if(stravaToken) {
+        loginBtn.innerText = "Strava trennen";
+    } else {
+        loginBtn.innerText = "Strava verbinden";
+    }
+
+    function handleLoginToggle() {
+        if (stravaToken) {
+            // Disconnect: remove token from URL and reload
+            window.location.href = window.location.pathname;
+        } else {
+            // Connect: redirect to login route
+            window.location.href = '/login';
+        }
+    }
 
     // Map Setup
     const map = L.map('map').setView([47.26, 11.40], 12);
