@@ -262,9 +262,12 @@
                 <span style="font-size:0.7rem; color:#666">${t.date}</span>
                 <a href="https://www.strava.com/activities/${t.id}" target="_blank" style="font-size:0.7rem; color:var(--strava-orange); text-decoration:none;">View on Strava ↗</a>
             </div>
-            <div style="margin-top:8px; display:flex; align-items:center; gap:10px;">
-                <button onclick="toggleVisibility('${t.id}')" id="vis-${t.id}" style="border:none; background:none; cursor:pointer; font-size:1.1rem">👁️</button>
-                <input type="number" value="${t.offset}" style="width:70px" onchange="updateOffset('${t.id}', this.value)"> <small>s offset</small>
+            <div style="margin-top:8px; display:flex; flex-direction:column; gap:4px;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <button onclick="toggleVisibility('${t.id}')" id="vis-${t.id}" style="border:none; background:none; cursor:pointer; font-size:1.1rem; padding:0">👁️</button>
+                    <input type="range" min="-300" max="300" value="${t.offset}" style="flex:1" oninput="updateOffset('${t.id}', this.value); document.getElementById('offval-${t.id}').innerText = this.value + 's'">
+                </div>
+                <div style="font-size:0.7rem; color:#666; text-align:right;">Offset: <span id="offval-${t.id}" style="font-weight:bold">${t.offset}s</span></div>
             </div>
         `;
         document.getElementById('trackList').appendChild(div);
