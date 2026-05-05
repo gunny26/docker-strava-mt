@@ -1,0 +1,12 @@
+- Use types everywhere possible.
+- verwende python type hint in python programmen
+- kommentare in sourcecode sollen immer in englischer sprache verfasst werden
+- kommentare in README.md sollen in deutscher sprache verfasst werden
+- Ausgaben für Anwender sollen in deutscher sprache verfasst werden
+- das logging modul soll für interne meldungen verwendet werden
+- commandline tools sollen immer einen parameter  -v/--verbose haben um auf das DEBUG level zu schalten
+- commandline tools sollen immer einen parameter -q/--quiet haben um auf das ERROR level zu schalten
+- alle verwendeten python module die nicht in der standard library enthalten sind sollen in einer requirements.txt datei notiert werden
+- jede funktion soll einen docstring haben
+- verwende in python prorgammen nie tab zeichen "\t", ersetze es immer mit 4 spaces
+- eine zeile in einem python programm soll nie mit leerzeichen enden
