@@ -130,6 +130,13 @@
         }
     };
 
+    function formatPace(decimalMin) {
+        if (!decimalMin || decimalMin === Infinity) return "0:00";
+        const mins = Math.floor(decimalMin);
+        const secs = Math.round((decimalMin - mins) * 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
     function updateValueLegend(chart, t) {
         const id = chart.canvas.id.split('Chart')[0];
         const legendDiv = document.getElementById(`vals-${id}`);
@@ -139,7 +146,10 @@
         chart.data.datasets.forEach(ds => {
             if (ds.hidden) return;
             const point = ds.data.find(p => Math.abs(p.x - t) < 1.5);
-            if (point) html += `<div style="color:${ds.borderColor}">● ${point.y.toFixed(1)}</div>`;
+            if (point) {
+                const val = id === 'speed' ? formatPace(point.y) : point.y.toFixed(1);
+                html += `<div style="color:${ds.borderColor}">● ${val}</div>`;
+            }
         });
         legendDiv.innerHTML = html;
     }
@@ -181,7 +191,7 @@
         altitude: createChart('altitudeChart', 'Altitude (m)'),
         cadence: createChart('cadenceChart', 'Cadence (spm)'),
         hr: createChart('hrChart', 'Heart Rate (bpm)'),
-        speed: createChart('speedChart', 'Speed (m/s)')
+        speed: createChart('speedChart', 'Pace (min/km)')
     };
 
     function syncZoom({chart}) {
@@ -278,7 +288,14 @@
     function updateAllCharts() {
         const createDs = (t, key) => ({
             label: t.name,
-            data: t.stream.time.data.map((time, i) => ({ x: time - t.offset, y: t.stream[key] ? t.stream[key].data[i] : 0 })),
+            data: t.stream.time.data.map((time, i) => {
+                let val = t.stream[key] ? t.stream[key].data[i] : 0;
+                if (key === 'velocity_smooth') {
+                    // Convert m/s to min/km: 1000 / (v * 60)
+                    val = val > 0.5 ? (1000 / (val * 60)) : 0;
+                }
+                return { x: time - t.offset, y: val };
+            }),
             borderColor: t.color, borderWidth: 1.5, pointRadius: 0, tension: 0.1, hidden: !t.visible
         });
         charts.altitude.data.datasets = tracks.map(t => createDs(t, 'altitude'));
