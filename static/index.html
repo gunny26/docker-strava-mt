@@ -252,6 +252,10 @@
         div.className = 'track-item';
         div.id = `item-${t.id}`;
         div.style.borderLeft = `5px solid ${t.color}`;
+        
+        // Calculate the maximum duration of this specific track
+        const trackDuration = t.stream.time.data[t.stream.time.data.length - 1];
+        
         div.innerHTML = `
             <h4 style="margin:0; display:flex; justify-content:space-between; align-items:flex-start;">
                 <span style="flex:1">${t.name}</span>
@@ -265,7 +269,7 @@
             <div style="margin-top:8px; display:flex; flex-direction:column; gap:4px;">
                 <div style="display:flex; align-items:center; gap:10px;">
                     <button onclick="toggleVisibility('${t.id}')" id="vis-${t.id}" style="border:none; background:none; cursor:pointer; font-size:1.1rem; padding:0">👁️</button>
-                    <input type="range" min="-300" max="300" value="${t.offset}" style="flex:1" oninput="updateOffset('${t.id}', this.value); document.getElementById('offval-${t.id}').innerText = this.value + 's'">
+                    <input type="range" min="-${trackDuration}" max="${trackDuration}" value="${t.offset}" style="flex:1" oninput="updateOffset('${t.id}', this.value); document.getElementById('offval-${t.id}').innerText = this.value + 's'">
                 </div>
                 <div style="font-size:0.7rem; color:#666; text-align:right;">Offset: <span id="offval-${t.id}" style="font-weight:bold">${t.offset}s</span></div>
             </div>
