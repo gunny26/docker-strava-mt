@@ -1,4 +1,13 @@
 services:
+  backend:
+    build: .
+    ports:
+      - "8080:8000"
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+
   aider_full:
     image: paulgauthier/aider-full
     container_name: aider_full
