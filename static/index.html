@@ -18,7 +18,10 @@
         header { background: white; padding: 5px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--strava-orange); box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 100; }
         .header-left { display: flex; align-items: center; gap: 15px; }
         header img { height: 30px; border-radius: 4px; }
+        .header-right { display: flex; align-items: center; gap: 10px; }
         #loginBtn { background: var(--strava-orange); color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-donate { background: #ffc439; color: #333; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; text-decoration: none; display: inline-block; font-size: 0.9rem; }
+        .btn-donate:hover { background: #f4bb33; }
         .main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
         
         /* Sidebar on the right */
@@ -48,7 +51,10 @@
         <img src="/static/favicon.png" alt="Logo">
         <h1>Strava Multi-Track Analyzer</h1>
     </div>
-    <button id="loginBtn" onclick="handleLoginToggle()">Strava verbinden</button>
+    <div class="header-right">
+        <a href="https://paypal.me/DEIN_PAYPAL_NAME" target="_blank" class="btn-donate" title="Unterstütze dieses Projekt">☕ Spenden</a>
+        <button id="loginBtn" onclick="handleLoginToggle()">Strava verbinden</button>
+    </div>
 </header>
 
 <div class="main-container">
