@@ -1,15 +1,15 @@
-version: '3.8'
-
 services:
-  web:
-    build: .
-    container_name: strava-mt-app
-    restart: always
+  aider_full:
+    image: paulgauthier/aider-full
+    container_name: aider_full
+    restart: no
     # Loading the environment file
     env_file:
       - .env
     ports:
       - "8000:8000"
     volumes:
-      - .:/app
+      - /Users/mesznera/gits/fw_analyzer:/app
+      - /Users/mesznera/.gitconfig:/app/.gitconfig:ro
+      - /Users/mesznera/.vim:/app/.vim:ro
     # Ensure dependencies are installed or use a pre-built image
