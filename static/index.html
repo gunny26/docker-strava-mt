@@ -86,7 +86,10 @@
             <div style="display:flex; flex-direction:column; gap:8px;">
                 <input type="text" id="setNameIn" placeholder="Set Title">
                 <button class="btn-primary" onclick="saveCurrentSet()">Save Locally</button>
-                <select id="setsSelect" onchange="loadSet(this.value)"><option value="">-- Load Set --</option></select>
+                <div style="display:flex; gap:5px;">
+                    <select id="setsSelect" onchange="loadSet(this.value)" style="flex:1"><option value="">-- Load Set --</option></select>
+                    <button class="btn-primary" onclick="deleteCurrentSet()" style="background: #e6194b;" title="Ausgewähltes Set löschen">🗑️</button>
+                </div>
             </div>
         </div>
     </div>
@@ -426,9 +429,42 @@
         const title = document.getElementById('setNameIn').value || "Set " + new Date().toLocaleDateString();
         const set = { title, tracks: tracks.map(t => ({ id: t.id, offset: t.offset })) };
         let saved = JSON.parse(localStorage.getItem('strava_sets') || '[]');
-        saved.push(set);
+        
+        const existingIndex = saved.findIndex(s => s.title === title);
+        if (existingIndex !== -1) {
+            if (!confirm(`Ein Set mit dem Namen "${title}" existiert bereits. Möchtest du es überschreiben?`)) {
+                return;
+            }
+            saved[existingIndex] = set;
+        } else {
+            saved.push(set);
+        }
+        
         localStorage.setItem('strava_sets', JSON.stringify(saved));
         loadSavedSetsList();
+        
+        // Select the newly saved set
+        const newIndex = saved.findIndex(s => s.title === title);
+        document.getElementById('setsSelect').value = newIndex;
+    }
+
+    function deleteCurrentSet() {
+        const sel = document.getElementById('setsSelect');
+        const idx = sel.value;
+        if (idx === "") {
+            alert("Bitte wähle zuerst ein Set aus, das gelöscht werden soll.");
+            return;
+        }
+        
+        let saved = JSON.parse(localStorage.getItem('strava_sets') || '[]');
+        const title = saved[idx].title;
+        
+        if (confirm(`Möchtest du das Set "${title}" wirklich löschen?`)) {
+            saved.splice(idx, 1);
+            localStorage.setItem('strava_sets', JSON.stringify(saved));
+            loadSavedSetsList();
+            document.getElementById('setNameIn').value = "";
+        }
     }
 
     function loadSavedSetsList() {
@@ -443,6 +479,7 @@
     async function loadSet(idx) {
         if (idx === "") return;
         const set = JSON.parse(localStorage.getItem('strava_sets'))[idx];
+        document.getElementById('setNameIn').value = set.title;
         [...tracks].forEach(t => removeTrack(t.id));
         for (const t of set.tracks) await fetchTrack(t.id, t.offset);
     }
