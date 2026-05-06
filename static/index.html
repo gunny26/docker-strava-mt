@@ -274,7 +274,33 @@
             const stream = await sRes.json();
             const info = await iRes.json();
             const color = PALETTE[colorIdx++ % PALETTE.length];
-            const athleteName = (info.athlete && info.athlete.firstname) ? `${info.athlete.firstname} ${info.athlete.lastname || ''}` : 'Unknown';
+            
+            let athleteName = 'Unknown';
+            if (info.athlete && info.athlete.firstname) {
+                athleteName = `${info.athlete.firstname} ${info.athlete.lastname || ''}`.trim();
+            } else if (stravaToken) {
+                try {
+                    // Versuche den Namen des eingeloggten Athleten direkt von Strava zu holen
+                    const athRes = await fetch('https://www.strava.com/api/v3/athlete', {
+                        headers: { 'Authorization': `Bearer ${stravaToken}` }
+                    });
+                    if (athRes.ok) {
+                        const athData = await athRes.json();
+                        // Prüfen ob die Aktivität dem eingeloggten User gehört
+                        if (!info.athlete || info.athlete.id === athData.id) {
+                            athleteName = `${athData.firstname} ${athData.lastname || ''}`.trim();
+                        } else {
+                            athleteName = `Athlete ID: ${info.athlete.id}`;
+                        }
+                    } else if (info.athlete && info.athlete.id) {
+                        athleteName = `Athlete ID: ${info.athlete.id}`;
+                    }
+                } catch (e) {
+                    if (info.athlete && info.athlete.id) athleteName = `Athlete ID: ${info.athlete.id}`;
+                }
+            } else if (info.athlete && info.athlete.id) {
+                athleteName = `Athlete ID: ${info.athlete.id}`;
+            }
 
             const track = {
                 id: actId, name: info.name, athlete: athleteName,
