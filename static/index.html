@@ -197,6 +197,21 @@
         }
     }
 
+    function getDistanceAtTime(tr, targetTime) {
+        if (!tr.stream.distance) return 0;
+        const times = tr.stream.time.data;
+        const dists = tr.stream.distance.data;
+        if (targetTime <= times[0]) return dists[0];
+        if (targetTime >= times[times.length - 1]) return dists[dists.length - 1];
+        for (let i = 0; i < times.length - 1; i++) {
+            if (targetTime >= times[i] && targetTime <= times[i+1]) {
+                const r = (targetTime - times[i]) / (times[i+1] - times[i]);
+                return dists[i] + r * (dists[i+1] - dists[i]);
+            }
+        }
+        return 0;
+    }
+
     // Helper to get distance from time for the first visible track
     function getActiveX() {
         let t = hoverTime !== null ? hoverTime : globalTime;
@@ -204,16 +219,10 @@
         
         const tr = tracks.find(x => x.visible);
         if (tr && tr.stream.distance) {
-            const adjustedT = t + tr.offset;
-            const times = tr.stream.time.data;
-            const dists = tr.stream.distance.data;
-            for (let i = 0; i < times.length - 1; i++) {
-                if (adjustedT >= times[i] && adjustedT <= times[i+1]) {
-                    const r = (adjustedT - times[i]) / (times[i+1] - times[i]);
-                    return dists[i] + r * (dists[i+1] - dists[i]);
-                }
-            }
-            return dists[dists.length - 1];
+            const adjustedT = t + tr.cropStart;
+            const distAtCropStart = getDistanceAtTime(tr, tr.cropStart);
+            const currentDist = getDistanceAtTime(tr, adjustedT);
+            return currentDist - distAtCropStart;
         }
         return t;
     }
@@ -334,15 +343,18 @@
                             if (tr && tr.stream.distance) {
                                 const dists = tr.stream.distance.data;
                                 const times = tr.stream.time.data;
+                                const distAtCropStart = getDistanceAtTime(tr, tr.cropStart);
+                                const targetDist = hoveredX + distAtCropStart;
+                                
                                 let tVal = times[0];
                                 for (let i = 0; i < dists.length - 1; i++) {
-                                    if (hoveredX >= dists[i] && hoveredX <= dists[i+1]) {
-                                        const r = (hoveredX - dists[i]) / (dists[i+1] - dists[i]);
+                                    if (targetDist >= dists[i] && targetDist <= dists[i+1]) {
+                                        const r = (targetDist - dists[i]) / (dists[i+1] - dists[i]);
                                         tVal = times[i] + r * (times[i+1] - times[i]);
                                         break;
                                     }
                                 }
-                                hoverTime = tVal - tr.offset;
+                                hoverTime = tVal - tr.cropStart;
                             } else {
                                 hoverTime = hoveredX;
                             }
@@ -384,7 +396,21 @@
 
     function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
 
-    async function fetchTrack(id = null, offset = 0) {
+    function recalcMaxDuration() {
+        maxDuration = 0;
+        tracks.forEach(t => {
+            if (t.visible) {
+                maxDuration = Math.max(maxDuration, t.cropEnd - t.cropStart);
+            }
+        });
+        document.getElementById('globalSlider').max = maxDuration;
+        if (globalTime > maxDuration) {
+            globalTime = maxDuration;
+            document.getElementById('globalSlider').value = globalTime;
+        }
+    }
+
+    async function fetchTrack(id = null, cropStart = null, cropEnd = null) {
         const actId = id || document.getElementById('actIdIn').value;
         if (!actId || !stravaToken) return alert("Please Connect Strava");
         try {
@@ -421,17 +447,21 @@
                 athleteName = `Athlete ID: ${info.athlete.id}`;
             }
 
+            const maxTime = stream.time.data[stream.time.data.length - 1];
+
             const track = {
                 id: actId, name: info.name, athlete: athleteName,
                 date: new Date(info.start_date).toLocaleDateString(), 
-                stream, color, offset: parseFloat(offset), visible: true,
+                stream, color, 
+                cropStart: cropStart !== null ? parseFloat(cropStart) : 0,
+                cropEnd: cropEnd !== null ? parseFloat(cropEnd) : maxTime,
+                visible: true,
                 marker: L.circleMarker([0,0], { color: 'white', fillColor: color, fillOpacity: 1, radius: 7 }).addTo(map),
                 poly: L.polyline(stream.latlng.data, { color, weight: 3, opacity: 0.5 }).addTo(map)
             };
             tracks.push(track);
-            maxDuration = Math.max(maxDuration, ...stream.time.data);
-            document.getElementById('globalSlider').max = maxDuration;
             
+            recalcMaxDuration();
             renderTrackItem(track);
             updateAllCharts();
             map.fitBounds(track.poly.getBounds());
@@ -456,13 +486,23 @@
                 <span style="font-size:0.7rem; color:#666">${t.date}</span>
                 <a href="https://www.strava.com/activities/${t.id}" target="_blank" style="font-size:0.7rem; color:var(--strava-orange); text-decoration:none;">View on Strava ↗</a>
             </div>
-            <div style="margin-top:8px; display:flex; flex-direction:column; gap:4px;">
+            <div style="margin-top:8px; display:flex; flex-direction:column; gap:8px;">
                 <div style="display:flex; align-items:center; gap:10px;">
                     <button onclick="toggleVisibility('${t.id}')" id="vis-${t.id}" style="border:none; background:none; cursor:pointer; font-size:1.1rem; padding:0" title="Sichtbarkeit umschalten">👁️</button>
                     <button onclick="setReference('${t.id}')" id="ref-${t.id}" style="border:none; background:none; cursor:pointer; font-size:1.1rem; padding:0; opacity:0.3" title="Als Referenz setzen">🎯</button>
-                    <input type="range" min="-${trackDuration}" max="${trackDuration}" value="${t.offset}" style="flex:1" oninput="updateOffset('${t.id}', this.value); document.getElementById('offval-${t.id}').innerText = this.value + 's'">
                 </div>
-                <div style="font-size:0.7rem; color:#666; text-align:right;">Offset: <span id="offval-${t.id}" style="font-weight:bold">${t.offset}s</span></div>
+                <div style="display:flex; flex-direction:column; gap:4px; width:100%;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="font-size:0.7rem; width:30px;">Start</span>
+                        <input type="range" id="cropStart-${t.id}" min="0" max="${trackDuration}" value="${t.cropStart}" style="flex:1" oninput="updateCrop('${t.id}', 'start', this.value)">
+                        <span id="startval-${t.id}" style="font-size:0.7rem; font-weight:bold; width:35px; text-align:right;">${t.cropStart}s</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="font-size:0.7rem; width:30px;">End</span>
+                        <input type="range" id="cropEnd-${t.id}" min="0" max="${trackDuration}" value="${t.cropEnd}" style="flex:1" oninput="updateCrop('${t.id}', 'end', this.value)">
+                        <span id="endval-${t.id}" style="font-size:0.7rem; font-weight:bold; width:35px; text-align:right;">${t.cropEnd}s</span>
+                    </div>
+                </div>
             </div>
         `;
         document.getElementById('trackList').appendChild(div);
@@ -488,6 +528,7 @@
         t.visible = !t.visible;
         document.getElementById(`vis-${id}`).style.opacity = t.visible ? "1" : "0.3";
         if (t.visible) { t.marker.addTo(map); t.poly.addTo(map); } else { map.removeLayer(t.marker); map.removeLayer(t.poly); }
+        recalcMaxDuration();
         updateAllCharts();
     }
 
@@ -498,13 +539,27 @@
             tracks.splice(idx, 1);
             document.getElementById(`item-${id}`).remove();
             if (referenceTrackId === id) referenceTrackId = null;
+            recalcMaxDuration();
             updateAllCharts();
         }
     }
 
-    function updateOffset(id, val) {
+    function updateCrop(id, type, val) {
         const t = tracks.find(x => x.id === id);
-        if (t) t.offset = parseFloat(val);
+        if (!t) return;
+        
+        let numVal = parseFloat(val);
+        if (type === 'start') {
+            t.cropStart = Math.min(numVal, t.cropEnd);
+            document.getElementById(`cropStart-${id}`).value = t.cropStart;
+            document.getElementById(`startval-${id}`).innerText = t.cropStart + 's';
+        } else {
+            t.cropEnd = Math.max(numVal, t.cropStart);
+            document.getElementById(`cropEnd-${id}`).value = t.cropEnd;
+            document.getElementById(`endval-${id}`).innerText = t.cropEnd + 's';
+        }
+        
+        recalcMaxDuration();
         updateAllCharts();
         syncGlobal();
     }
@@ -514,9 +569,10 @@
 
         const getRefValue = (key, globalTime) => {
             if (!refTrack || !refTrack.stream[key]) return 0;
-            const refLocalTime = globalTime + refTrack.offset;
-            const times = refTrack.stream.time.data;
+            const refLocalTime = globalTime + refTrack.cropStart;
+            if (refLocalTime < refTrack.cropStart || refLocalTime > refTrack.cropEnd) return 0;
             
+            const times = refTrack.stream.time.data;
             let closestIdx = 0;
             let minDiff = Infinity;
             for (let i = 0; i < times.length; i++) {
@@ -534,30 +590,40 @@
             return val;
         };
 
-        const createDs = (t, key) => ({
-            label: t.name,
-            data: t.stream.time.data.map((time, i) => {
-                let val = t.stream[key] ? t.stream[key].data[i] : 0;
-                if (key === 'velocity_smooth') {
-                    val = val > 0.5 ? (1000 / (val * 60)) : 0;
+        const createDs = (t, key) => {
+            const distAtCropStart = xAxisMode === 'distance' ? getDistanceAtTime(t, t.cropStart) : 0;
+            const filteredData = [];
+            
+            for (let i = 0; i < t.stream.time.data.length; i++) {
+                const time = t.stream.time.data[i];
+                if (time >= t.cropStart && time <= t.cropEnd) {
+                    let val = t.stream[key] ? t.stream[key].data[i] : 0;
+                    if (key === 'velocity_smooth') {
+                        val = val > 0.5 ? (1000 / (val * 60)) : 0;
+                    }
+                    
+                    const globalTime = time - t.cropStart;
+                    
+                    if (refTrack) {
+                        const refVal = getRefValue(key, globalTime);
+                        val = val - refVal;
+                    }
+                    
+                    let xVal = globalTime;
+                    if (xAxisMode === 'distance' && t.stream.distance) {
+                        xVal = t.stream.distance.data[i] - distAtCropStart;
+                    }
+                    
+                    filteredData.push({ x: xVal, y: val });
                 }
-                
-                const globalTime = time - t.offset;
-                
-                if (refTrack) {
-                    const refVal = getRefValue(key, globalTime);
-                    val = val - refVal;
-                }
-                
-                let xVal = globalTime;
-                if (xAxisMode === 'distance' && t.stream.distance) {
-                    xVal = t.stream.distance.data[i];
-                }
-                
-                return { x: xVal, y: val };
-            }),
-            borderColor: t.color, borderWidth: 1.5, pointRadius: 0, tension: 0.1, hidden: !t.visible
-        });
+            }
+            
+            return {
+                label: t.name,
+                data: filteredData,
+                borderColor: t.color, borderWidth: 1.5, pointRadius: 0, tension: 0.1, hidden: !t.visible
+            };
+        };
 
         charts.altitude.data.datasets = tracks.map(t => createDs(t, 'altitude'));
         charts.cadence.data.datasets = tracks.map(t => createDs(t, 'cadence'));
@@ -579,12 +645,14 @@
         const t = hoverTime !== null ? hoverTime : globalTime;
         tracks.forEach(tr => {
             if (!tr.visible) return;
-            const adjustedT = t + tr.offset;
+            const adjustedT = t + tr.cropStart;
+            const clampedT = Math.max(tr.cropStart, Math.min(tr.cropEnd, adjustedT));
+            
             const times = tr.stream.time.data;
             const latlngs = tr.stream.latlng.data;
             for (let i = 0; i < times.length - 1; i++) {
-                if (adjustedT >= times[i] && adjustedT <= times[i+1]) {
-                    const r = (adjustedT - times[i]) / (times[i+1] - times[i]);
+                if (clampedT >= times[i] && clampedT <= times[i+1]) {
+                    const r = (clampedT - times[i]) / (times[i+1] - times[i]);
                     tr.marker.setLatLng([
                         latlngs[i][0] + r * (latlngs[i+1][0] - latlngs[i][0]),
                         latlngs[i][1] + r * (latlngs[i+1][1] - latlngs[i][1])
@@ -604,7 +672,7 @@
     // Storage logic
     function saveCurrentSet() {
         const title = document.getElementById('setNameIn').value || "Set " + new Date().toLocaleDateString();
-        const set = { title, tracks: tracks.map(t => ({ id: t.id, offset: t.offset })) };
+        const set = { title, tracks: tracks.map(t => ({ id: t.id, cropStart: t.cropStart, cropEnd: t.cropEnd })) };
         let saved = JSON.parse(localStorage.getItem('strava_sets') || '[]');
         
         const existingIndex = saved.findIndex(s => s.title === title);
@@ -657,7 +725,7 @@
         const set = JSON.parse(localStorage.getItem('strava_sets'))[idx];
         document.getElementById('setNameIn').value = set.title;
         [...tracks].forEach(t => removeTrack(t.id));
-        for (const t of set.tracks) await fetchTrack(t.id, t.offset);
+        for (const t of set.tracks) await fetchTrack(t.id, t.cropStart, t.cropEnd);
     }
 
     function playLoop() {
