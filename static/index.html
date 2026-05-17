@@ -37,11 +37,18 @@
         .content-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
         #map { height: 35vh; width: 100%; border-bottom: 1px solid #ccc; flex-shrink: 0; }
         .playback-panel { background: white; padding: 10px 20px; border-bottom: 1px solid #ddd; display: flex; align-items: center; gap: 15px; flex-shrink: 0; }
-        .charts-grid { flex: 1; padding: 10px; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .chart-box { background: white; padding: 8px; border-radius: 8px; height: 210px; position: relative; }
+        
+        /* Charts Layout changed to full width stacked */
+        .charts-grid { flex: 1; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        .chart-box { background: white; padding: 8px; border-radius: 8px; height: 220px; position: relative; flex-shrink: 0; }
+        
         .value-legend { position: absolute; top: 35px; right: 10px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 4px; font-size: 0.7rem; pointer-events: none; z-index: 10; border: 1px solid #eee; }
         footer { background: #333; color: #ccc; padding: 5px; font-size: 0.7rem; text-align: center; }
         .btn-primary { background: var(--strava-orange); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        
+        .settings-group { background: #f9f9f9; padding: 10px; border-radius: 6px; border: 1px solid #eee; }
+        .settings-group h5 { margin: 0 0 8px 0; font-size: 0.85rem; color: #333; }
+        .settings-row { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; margin-bottom: 4px; }
     </style>
 </head>
 <body>
@@ -68,10 +75,10 @@
             <button onclick="resetZoom()" style="font-size:0.7rem">Reset Zoom</button>
         </div>
         <div class="charts-grid">
-            <div class="chart-box"><div id="vals-altitude" class="value-legend"></div><canvas id="altitudeChart"></canvas></div>
-            <div class="chart-box"><div id="vals-cadence" class="value-legend"></div><canvas id="cadenceChart"></canvas></div>
-            <div class="chart-box"><div id="vals-hr" class="value-legend"></div><canvas id="hrChart"></canvas></div>
-            <div class="chart-box"><div id="vals-speed" class="value-legend"></div><canvas id="speedChart"></canvas></div>
+            <div class="chart-box" id="box-altitude"><div id="vals-altitude" class="value-legend"></div><canvas id="altitudeChart"></canvas></div>
+            <div class="chart-box" id="box-speed"><div id="vals-speed" class="value-legend"></div><canvas id="speedChart"></canvas></div>
+            <div class="chart-box" id="box-cadence"><div id="vals-cadence" class="value-legend"></div><canvas id="cadenceChart"></canvas></div>
+            <div class="chart-box" id="box-hr"><div id="vals-hr" class="value-legend"></div><canvas id="hrChart"></canvas></div>
         </div>
     </div>
 
@@ -82,7 +89,25 @@
                 <button class="btn-primary" onclick="fetchTrack()">Add</button>
             </div>
             <div id="trackList"></div>
-            <hr>
+            
+            <div class="settings-group">
+                <h5>Globale Einstellungen</h5>
+                <div style="margin-bottom: 10px;">
+                    <div style="font-weight:bold; font-size:0.75rem; margin-bottom:4px;">X-Achse:</div>
+                    <label class="settings-row"><input type="radio" name="xaxis" value="time" checked onchange="setXAxis('time')"> Zeit</label>
+                    <label class="settings-row"><input type="radio" name="xaxis" value="distance" onchange="setXAxis('distance')"> Distanz</label>
+                </div>
+                <div>
+                    <div style="font-weight:bold; font-size:0.75rem; margin-bottom:4px;">Grafiken anzeigen:</div>
+                    <label class="settings-row"><input type="checkbox" checked onchange="toggleChart('altitude', this.checked)"> Höhenmeter</label>
+                    <label class="settings-row"><input type="checkbox" checked onchange="toggleChart('speed', this.checked)"> Geschwindigkeit</label>
+                    <label class="settings-row"><input type="checkbox" checked onchange="toggleChart('cadence', this.checked)"> Schrittfrequenz</label>
+                    <label class="settings-row"><input type="checkbox" checked onchange="toggleChart('hr', this.checked)"> Puls</label>
+                </div>
+            </div>
+
+            <hr style="width:100%; border:0; border-top:1px solid #eee;">
+            
             <div style="display:flex; flex-direction:column; gap:8px;">
                 <input type="text" id="setNameIn" placeholder="Set Title">
                 <button class="btn-primary" onclick="saveCurrentSet()">Save Locally</button>
@@ -101,12 +126,13 @@
 <script>
     // Global State
     let tracks = [];
-    let charts = {}; // Initialized later to avoid ReferenceError
+    let charts = {}; 
     let isPlaying = false;
     let globalTime = 0;
     let maxDuration = 0;
     let hoverTime = null;
-    let referenceTrackId = null; // Speichert die ID des Referenz-Tracks
+    let referenceTrackId = null; 
+    let xAxisMode = 'time'; // 'time' or 'distance'
     const PALETTE = ['#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6', '#000075'];
     let colorIdx = 0;
 
@@ -123,10 +149,8 @@
 
     function handleLoginToggle() {
         if (stravaToken) {
-            // Disconnect: remove token from URL and reload
             window.location.href = window.location.pathname;
         } else {
-            // Connect: redirect to login route
             window.location.href = '/login';
         }
     }
@@ -144,27 +168,52 @@
         attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
     });
 
-    // Add default layer
     osmLayer.addTo(map);
-
-    // Add layer control
-    const baseMaps = {
-        "OpenStreetMap": osmLayer,
-        "OpenTopoMap (Höhenlinien)": topoLayer
-    };
+    const baseMaps = { "OpenStreetMap": osmLayer, "OpenTopoMap (Höhenlinien)": topoLayer };
     L.control.layers(baseMaps).addTo(map);
 
-    // Repaired Sync Plugin
+    // Settings Functions
+    function setXAxis(mode) {
+        xAxisMode = mode;
+        updateAllCharts();
+        resetZoom();
+    }
+
+    function toggleChart(id, isVisible) {
+        document.getElementById(`box-${id}`).style.display = isVisible ? 'block' : 'none';
+    }
+
+    // Helper to get distance from time for the first visible track
+    function getActiveX() {
+        let t = hoverTime !== null ? hoverTime : globalTime;
+        if (xAxisMode === 'time') return t;
+        
+        const tr = tracks.find(x => x.visible);
+        if (tr && tr.stream.distance) {
+            const adjustedT = t + tr.offset;
+            const times = tr.stream.time.data;
+            const dists = tr.stream.distance.data;
+            for (let i = 0; i < times.length - 1; i++) {
+                if (adjustedT >= times[i] && adjustedT <= times[i+1]) {
+                    const r = (adjustedT - times[i]) / (times[i+1] - times[i]);
+                    return dists[i] + r * (dists[i+1] - dists[i]);
+                }
+            }
+            return dists[dists.length - 1];
+        }
+        return t;
+    }
+
+    // Sync Plugin
     const syncPlugin = {
         id: 'syncPlugin',
         afterDraw: (chart) => {
-            const activeT = hoverTime !== null ? hoverTime : globalTime;
+            const activeX = getActiveX();
             const {ctx, scales: {x, y}} = chart;
             
-            // Check if scales exist to avoid errors during init
             if (!x || !y) return;
 
-            const xPixel = x.getPixelForValue(activeT);
+            const xPixel = x.getPixelForValue(activeX);
             if (xPixel >= x.left && xPixel <= x.right) {
                 ctx.save();
                 ctx.setLineDash([5, 5]);
@@ -176,7 +225,7 @@
                 ctx.stroke();
                 ctx.restore();
             }
-            updateValueLegend(chart, activeT);
+            updateValueLegend(chart, activeX);
         }
     };
 
@@ -189,17 +238,29 @@
         return `${isNegative ? '-' : ''}${mins}:${secs.toString().padStart(2, '0')}`;
     }
 
-    function updateValueLegend(chart, t) {
+    function updateValueLegend(chart, activeX) {
         const id = chart.canvas.id.split('Chart')[0];
         const legendDiv = document.getElementById(`vals-${id}`);
         if (!legendDiv) return;
         
         let html = "";
         chart.data.datasets.forEach(ds => {
-            if (ds.hidden) return;
-            const point = ds.data.find(p => Math.abs(p.x - t) < 1.5);
-            if (point) {
-                const val = id === 'speed' ? formatPace(point.y) : point.y.toFixed(1);
+            if (ds.hidden || ds.data.length === 0) return;
+            
+            // Find closest point
+            let closest = ds.data[0];
+            let minDiff = Math.abs(closest.x - activeX);
+            for(let i=1; i<ds.data.length; i++) {
+                let diff = Math.abs(ds.data[i].x - activeX);
+                if(diff < minDiff) {
+                    minDiff = diff;
+                    closest = ds.data[i];
+                }
+            }
+            
+            const threshold = xAxisMode === 'distance' ? 100 : 5;
+            if (minDiff < threshold) {
+                const val = id === 'speed' ? formatPace(closest.y) : closest.y.toFixed(1);
                 html += `<div style="color:${ds.borderColor}">● ${val}</div>`;
             }
         });
@@ -227,10 +288,31 @@
                 scales: { x: { type: 'linear', ticks: { display: false } } },
                 onHover: (e, el, chart) => {
                     if (isPlaying) return;
-                    // Fix: Ensure charts object exists before calling sync
                     if (Object.keys(charts).length === 4) {
                         const canvasPosition = Chart.helpers.getRelativePosition(e, chart);
-                        hoverTime = chart.scales.x.getValueForPixel(canvasPosition.x);
+                        const hoveredX = chart.scales.x.getValueForPixel(canvasPosition.x);
+                        
+                        if (xAxisMode === 'time') {
+                            hoverTime = hoveredX;
+                        } else {
+                            // Convert distance back to time
+                            const tr = tracks.find(t => t.visible);
+                            if (tr && tr.stream.distance) {
+                                const dists = tr.stream.distance.data;
+                                const times = tr.stream.time.data;
+                                let tVal = times[0];
+                                for (let i = 0; i < dists.length - 1; i++) {
+                                    if (hoveredX >= dists[i] && hoveredX <= dists[i+1]) {
+                                        const r = (hoveredX - dists[i]) / (dists[i+1] - dists[i]);
+                                        tVal = times[i] + r * (times[i+1] - times[i]);
+                                        break;
+                                    }
+                                }
+                                hoverTime = tVal - tr.offset;
+                            } else {
+                                hoverTime = hoveredX;
+                            }
+                        }
                         syncGlobal();
                     }
                 }
@@ -238,12 +320,11 @@
         });
     }
 
-    // Initialization after function declarations
     charts = {
         altitude: createChart('altitudeChart', 'Altitude (m)'),
+        speed: createChart('speedChart', 'Pace (min/km)'),
         cadence: createChart('cadenceChart', 'Cadence (spm)'),
-        hr: createChart('hrChart', 'Heart Rate (bpm)'),
-        speed: createChart('speedChart', 'Pace (min/km)')
+        hr: createChart('hrChart', 'Heart Rate (bpm)')
     };
 
     function syncZoom({chart}) {
@@ -286,13 +367,11 @@
                 athleteName = `${info.athlete.firstname} ${info.athlete.lastname || ''}`.trim();
             } else if (stravaToken) {
                 try {
-                    // Versuche den Namen des eingeloggten Athleten direkt von Strava zu holen
                     const athRes = await fetch('https://www.strava.com/api/v3/athlete', {
                         headers: { 'Authorization': `Bearer ${stravaToken}` }
                     });
                     if (athRes.ok) {
                         const athData = await athRes.json();
-                        // Prüfen ob die Aktivität dem eingeloggten User gehört
                         if (!info.athlete || info.athlete.id === athData.id) {
                             athleteName = `${athData.firstname} ${athData.lastname || ''}`.trim();
                         } else {
@@ -331,7 +410,6 @@
         div.id = `item-${t.id}`;
         div.style.borderLeft = `5px solid ${t.color}`;
         
-        // Calculate the maximum duration of this specific track
         const trackDuration = t.stream.time.data[t.stream.time.data.length - 1];
         
         div.innerHTML = `
@@ -358,12 +436,11 @@
 
     function setReference(id) {
         if (referenceTrackId === id) {
-            referenceTrackId = null; // Referenz aufheben
+            referenceTrackId = null;
         } else {
-            referenceTrackId = id; // Neue Referenz setzen
+            referenceTrackId = id;
         }
         
-        // Button-Opazität aktualisieren
         tracks.forEach(t => {
             const btn = document.getElementById(`ref-${t.id}`);
             if (btn) btn.style.opacity = (referenceTrackId === t.id) ? "1" : "0.3";
@@ -401,13 +478,11 @@
     function updateAllCharts() {
         const refTrack = referenceTrackId ? tracks.find(t => t.id === referenceTrackId) : null;
 
-        // Hilfsfunktion, um den Wert des Referenz-Tracks zu einem bestimmten globalen Zeitpunkt zu finden
         const getRefValue = (key, globalTime) => {
             if (!refTrack || !refTrack.stream[key]) return 0;
             const refLocalTime = globalTime + refTrack.offset;
             const times = refTrack.stream.time.data;
             
-            // Finde den Index mit der geringsten Zeitdifferenz
             let closestIdx = 0;
             let minDiff = Infinity;
             for (let i = 0; i < times.length; i++) {
@@ -430,19 +505,22 @@
             data: t.stream.time.data.map((time, i) => {
                 let val = t.stream[key] ? t.stream[key].data[i] : 0;
                 if (key === 'velocity_smooth') {
-                    // Convert m/s to min/km: 1000 / (v * 60)
                     val = val > 0.5 ? (1000 / (val * 60)) : 0;
                 }
                 
                 const globalTime = time - t.offset;
                 
-                // Wenn ein Referenz-Track aktiv ist, berechne die Differenz
                 if (refTrack) {
                     const refVal = getRefValue(key, globalTime);
                     val = val - refVal;
                 }
                 
-                return { x: globalTime, y: val };
+                let xVal = globalTime;
+                if (xAxisMode === 'distance' && t.stream.distance) {
+                    xVal = t.stream.distance.data[i];
+                }
+                
+                return { x: xVal, y: val };
             }),
             borderColor: t.color, borderWidth: 1.5, pointRadius: 0, tension: 0.1, hidden: !t.visible
         });
@@ -452,12 +530,13 @@
         charts.hr.data.datasets = tracks.map(t => createDs(t, 'heartrate'));
         charts.speed.data.datasets = tracks.map(t => createDs(t, 'velocity_smooth'));
         
-        // Titel der Diagramme anpassen, falls Referenz aktiv ist
         const suffix = refTrack ? ' (Delta zur Referenz)' : '';
-        charts.altitude.options.plugins.title.text = 'Altitude (m)' + suffix;
-        charts.cadence.options.plugins.title.text = 'Cadence (spm)' + suffix;
-        charts.hr.options.plugins.title.text = 'Heart Rate (bpm)' + suffix;
-        charts.speed.options.plugins.title.text = 'Pace (min/km)' + suffix;
+        const xSuffix = xAxisMode === 'distance' ? ' [Distanz]' : ' [Zeit]';
+        
+        charts.altitude.options.plugins.title.text = 'Altitude (m)' + suffix + xSuffix;
+        charts.cadence.options.plugins.title.text = 'Cadence (spm)' + suffix + xSuffix;
+        charts.hr.options.plugins.title.text = 'Heart Rate (bpm)' + suffix + xSuffix;
+        charts.speed.options.plugins.title.text = 'Pace (min/km)' + suffix + xSuffix;
 
         Object.values(charts).forEach(c => c.update());
     }
@@ -483,7 +562,6 @@
         document.getElementById('globalSlider').value = globalTime;
         document.getElementById('timeDisp').innerText = new Date(globalTime * 1000).toISOString().substr(14, 5);
         
-        // Final safety check for charts object
         if (Object.keys(charts).length === 4) {
             Object.values(charts).forEach(c => c.draw());
         }
@@ -508,7 +586,6 @@
         localStorage.setItem('strava_sets', JSON.stringify(saved));
         loadSavedSetsList();
         
-        // Select the newly saved set
         const newIndex = saved.findIndex(s => s.title === title);
         document.getElementById('setsSelect').value = newIndex;
     }
