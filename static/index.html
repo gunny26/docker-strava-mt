@@ -38,11 +38,17 @@
         #map { height: 35vh; width: 100%; border-bottom: 1px solid #ccc; flex-shrink: 0; }
         .playback-panel { background: white; padding: 10px 20px; border-bottom: 1px solid #ddd; display: flex; align-items: center; gap: 15px; flex-shrink: 0; }
         
-        /* Charts Layout changed to full width stacked */
-        .charts-grid { flex: 1; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
-        .chart-box { background: white; padding: 8px; border-radius: 8px; height: 220px; position: relative; flex-shrink: 0; }
+        /* Tabs Layout */
+        .charts-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: white; }
+        .tabs { display: flex; background: #f9f9f9; border-bottom: 1px solid #ddd; flex-shrink: 0; }
+        .tab-btn { flex: 1; padding: 10px; border: none; background: none; cursor: pointer; font-weight: bold; color: #666; border-bottom: 3px solid transparent; transition: all 0.2s; }
+        .tab-btn:hover { color: var(--strava-orange); background: #f0f0f0; }
+        .tab-btn.active { color: var(--strava-orange); border-bottom-color: var(--strava-orange); background: white; }
         
-        .value-legend { position: absolute; top: 35px; right: 10px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 4px; font-size: 0.7rem; pointer-events: none; z-index: 10; border: 1px solid #eee; }
+        .chart-box { display: none; flex: 1; padding: 15px; position: relative; min-height: 0; }
+        .chart-box.active { display: block; }
+        
+        .value-legend { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 4px; font-size: 0.7rem; pointer-events: none; z-index: 10; border: 1px solid #eee; }
         footer { background: #333; color: #ccc; padding: 5px; font-size: 0.7rem; text-align: center; }
         .btn-primary { background: var(--strava-orange); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; }
         
@@ -74,8 +80,15 @@
             <span id="timeDisp" style="font-family:monospace">00:00</span>
             <button onclick="resetZoom()" style="font-size:0.7rem">Reset Zoom</button>
         </div>
-        <div class="charts-grid">
-            <div class="chart-box" id="box-altitude"><div id="vals-altitude" class="value-legend"></div><canvas id="altitudeChart"></canvas></div>
+        
+        <div class="charts-container">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('altitude', this)">Höhenmeter</button>
+                <button class="tab-btn" onclick="switchTab('speed', this)">Geschwindigkeit</button>
+                <button class="tab-btn" onclick="switchTab('cadence', this)">Schrittfrequenz</button>
+                <button class="tab-btn" onclick="switchTab('hr', this)">Puls</button>
+            </div>
+            <div class="chart-box active" id="box-altitude"><div id="vals-altitude" class="value-legend"></div><canvas id="altitudeChart"></canvas></div>
             <div class="chart-box" id="box-speed"><div id="vals-speed" class="value-legend"></div><canvas id="speedChart"></canvas></div>
             <div class="chart-box" id="box-cadence"><div id="vals-cadence" class="value-legend"></div><canvas id="cadenceChart"></canvas></div>
             <div class="chart-box" id="box-hr"><div id="vals-hr" class="value-legend"></div><canvas id="hrChart"></canvas></div>
@@ -96,13 +109,6 @@
                     <div style="font-weight:bold; font-size:0.75rem; margin-bottom:4px;">X-Achse:</div>
                     <label class="settings-row"><input type="radio" name="xaxis" value="time" checked onchange="setXAxis('time')"> Zeit</label>
                     <label class="settings-row"><input type="radio" name="xaxis" value="distance" onchange="setXAxis('distance')"> Distanz</label>
-                </div>
-                <div>
-                    <div style="font-weight:bold; font-size:0.75rem; margin-bottom:4px;">Grafiken anzeigen:</div>
-                    <label class="settings-row"><input type="checkbox" checked onchange="toggleChart('altitude', this.checked)"> Höhenmeter</label>
-                    <label class="settings-row"><input type="checkbox" checked onchange="toggleChart('speed', this.checked)"> Geschwindigkeit</label>
-                    <label class="settings-row"><input type="checkbox" checked onchange="toggleChart('cadence', this.checked)"> Schrittfrequenz</label>
-                    <label class="settings-row"><input type="checkbox" checked onchange="toggleChart('hr', this.checked)"> Puls</label>
                 </div>
             </div>
 
@@ -179,8 +185,16 @@
         resetZoom();
     }
 
-    function toggleChart(id, isVisible) {
-        document.getElementById(`box-${id}`).style.display = isVisible ? 'block' : 'none';
+    function switchTab(tabId, btnElement) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.chart-box').forEach(box => box.classList.remove('active'));
+        
+        btnElement.classList.add('active');
+        document.getElementById(`box-${tabId}`).classList.add('active');
+        
+        if (charts[tabId]) {
+            charts[tabId].resize();
+        }
     }
 
     // Helper to get distance from time for the first visible track
@@ -285,7 +299,27 @@
                         zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x', onZoomComplete: syncZoom }
                     }
                 },
-                scales: { x: { type: 'linear', ticks: { display: false } } },
+                scales: { 
+                    x: { 
+                        type: 'linear', 
+                        ticks: { 
+                            display: true,
+                            callback: function(value) {
+                                if (xAxisMode === 'time') {
+                                    const absVal = Math.abs(value);
+                                    const h = Math.floor(absVal / 3600);
+                                    const m = Math.floor((absVal % 3600) / 60);
+                                    const s = Math.floor(absVal % 60);
+                                    const sign = value < 0 ? '-' : '';
+                                    if (h > 0) return `${sign}${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                                    return `${sign}${m}:${s.toString().padStart(2, '0')}`;
+                                } else {
+                                    return (value / 1000).toFixed(1) + ' km';
+                                }
+                            }
+                        } 
+                    } 
+                },
                 onHover: (e, el, chart) => {
                     if (isPlaying) return;
                     if (Object.keys(charts).length === 4) {
