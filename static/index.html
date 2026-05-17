@@ -424,6 +424,31 @@
         }
     }
 
+    function calculateCenteredMovingAverage(data, times, windowSeconds) {
+        const smoothed = new Array(data.length);
+        const halfWindow = windowSeconds / 2;
+        for (let i = 0; i < data.length; i++) {
+            let sum = 0;
+            let count = 0;
+            const targetTime = times[i];
+            
+            // Rückwärts schauen
+            for (let j = i; j >= 0; j--) {
+                if (targetTime - times[j] > halfWindow) break;
+                sum += data[j];
+                count++;
+            }
+            // Vorwärts schauen
+            for (let j = i + 1; j < data.length; j++) {
+                if (times[j] - targetTime > halfWindow) break;
+                sum += data[j];
+                count++;
+            }
+            smoothed[i] = sum / count;
+        }
+        return smoothed;
+    }
+
     async function fetchTrack(id = null, cropStart = null, cropEnd = null) {
         const actId = id || document.getElementById('actIdIn').value;
         if (!actId || !stravaToken) return alert("Please Connect Strava");
@@ -434,6 +459,19 @@
             ]);
             const stream = await sRes.json();
             const info = await iRes.json();
+            
+            // Glättung (Moving Average) für Geschwindigkeit und Schrittfrequenz
+            if (stream.time && stream.time.data) {
+                if (stream.velocity_smooth && stream.velocity_smooth.data) {
+                    // 15 Sekunden Fenster für Geschwindigkeit
+                    stream.velocity_smooth.data = calculateCenteredMovingAverage(stream.velocity_smooth.data, stream.time.data, 15);
+                }
+                if (stream.cadence && stream.cadence.data) {
+                    // 10 Sekunden Fenster für Schrittfrequenz
+                    stream.cadence.data = calculateCenteredMovingAverage(stream.cadence.data, stream.time.data, 10);
+                }
+            }
+            
             const color = PALETTE[colorIdx++ % PALETTE.length];
             
             let athleteName = 'Unknown';
