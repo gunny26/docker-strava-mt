@@ -106,6 +106,7 @@
     let globalTime = 0;
     let maxDuration = 0;
     let hoverTime = null;
+    let referenceTrackId = null; // Speichert die ID des Referenz-Tracks
     const PALETTE = ['#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6', '#000075'];
     let colorIdx = 0;
 
@@ -181,9 +182,11 @@
 
     function formatPace(decimalMin) {
         if (!decimalMin || decimalMin === Infinity) return "0:00";
-        const mins = Math.floor(decimalMin);
-        const secs = Math.round((decimalMin - mins) * 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
+        const isNegative = decimalMin < 0;
+        const absVal = Math.abs(decimalMin);
+        const mins = Math.floor(absVal);
+        const secs = Math.round((absVal - mins) * 60);
+        return `${isNegative ? '-' : ''}${mins}:${secs.toString().padStart(2, '0')}`;
     }
 
     function updateValueLegend(chart, t) {
@@ -343,13 +346,30 @@
             </div>
             <div style="margin-top:8px; display:flex; flex-direction:column; gap:4px;">
                 <div style="display:flex; align-items:center; gap:10px;">
-                    <button onclick="toggleVisibility('${t.id}')" id="vis-${t.id}" style="border:none; background:none; cursor:pointer; font-size:1.1rem; padding:0">👁️</button>
+                    <button onclick="toggleVisibility('${t.id}')" id="vis-${t.id}" style="border:none; background:none; cursor:pointer; font-size:1.1rem; padding:0" title="Sichtbarkeit umschalten">👁️</button>
+                    <button onclick="setReference('${t.id}')" id="ref-${t.id}" style="border:none; background:none; cursor:pointer; font-size:1.1rem; padding:0; opacity:0.3" title="Als Referenz setzen">🎯</button>
                     <input type="range" min="-${trackDuration}" max="${trackDuration}" value="${t.offset}" style="flex:1" oninput="updateOffset('${t.id}', this.value); document.getElementById('offval-${t.id}').innerText = this.value + 's'">
                 </div>
                 <div style="font-size:0.7rem; color:#666; text-align:right;">Offset: <span id="offval-${t.id}" style="font-weight:bold">${t.offset}s</span></div>
             </div>
         `;
         document.getElementById('trackList').appendChild(div);
+    }
+
+    function setReference(id) {
+        if (referenceTrackId === id) {
+            referenceTrackId = null; // Referenz aufheben
+        } else {
+            referenceTrackId = id; // Neue Referenz setzen
+        }
+        
+        // Button-Opazität aktualisieren
+        tracks.forEach(t => {
+            const btn = document.getElementById(`ref-${t.id}`);
+            if (btn) btn.style.opacity = (referenceTrackId === t.id) ? "1" : "0.3";
+        });
+        
+        updateAllCharts();
     }
 
     function toggleVisibility(id) {
@@ -366,6 +386,7 @@
             map.removeLayer(tracks[idx].marker); map.removeLayer(tracks[idx].poly);
             tracks.splice(idx, 1);
             document.getElementById(`item-${id}`).remove();
+            if (referenceTrackId === id) referenceTrackId = null;
             updateAllCharts();
         }
     }
@@ -378,6 +399,32 @@
     }
 
     function updateAllCharts() {
+        const refTrack = referenceTrackId ? tracks.find(t => t.id === referenceTrackId) : null;
+
+        // Hilfsfunktion, um den Wert des Referenz-Tracks zu einem bestimmten globalen Zeitpunkt zu finden
+        const getRefValue = (key, globalTime) => {
+            if (!refTrack || !refTrack.stream[key]) return 0;
+            const refLocalTime = globalTime + refTrack.offset;
+            const times = refTrack.stream.time.data;
+            
+            // Finde den Index mit der geringsten Zeitdifferenz
+            let closestIdx = 0;
+            let minDiff = Infinity;
+            for (let i = 0; i < times.length; i++) {
+                let diff = Math.abs(times[i] - refLocalTime);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestIdx = i;
+                }
+            }
+            
+            let val = refTrack.stream[key].data[closestIdx];
+            if (key === 'velocity_smooth') {
+                val = val > 0.5 ? (1000 / (val * 60)) : 0;
+            }
+            return val;
+        };
+
         const createDs = (t, key) => ({
             label: t.name,
             data: t.stream.time.data.map((time, i) => {
@@ -386,14 +433,32 @@
                     // Convert m/s to min/km: 1000 / (v * 60)
                     val = val > 0.5 ? (1000 / (val * 60)) : 0;
                 }
-                return { x: time - t.offset, y: val };
+                
+                const globalTime = time - t.offset;
+                
+                // Wenn ein Referenz-Track aktiv ist, berechne die Differenz
+                if (refTrack) {
+                    const refVal = getRefValue(key, globalTime);
+                    val = val - refVal;
+                }
+                
+                return { x: globalTime, y: val };
             }),
             borderColor: t.color, borderWidth: 1.5, pointRadius: 0, tension: 0.1, hidden: !t.visible
         });
+
         charts.altitude.data.datasets = tracks.map(t => createDs(t, 'altitude'));
         charts.cadence.data.datasets = tracks.map(t => createDs(t, 'cadence'));
         charts.hr.data.datasets = tracks.map(t => createDs(t, 'heartrate'));
         charts.speed.data.datasets = tracks.map(t => createDs(t, 'velocity_smooth'));
+        
+        // Titel der Diagramme anpassen, falls Referenz aktiv ist
+        const suffix = refTrack ? ' (Delta zur Referenz)' : '';
+        charts.altitude.options.plugins.title.text = 'Altitude (m)' + suffix;
+        charts.cadence.options.plugins.title.text = 'Cadence (spm)' + suffix;
+        charts.hr.options.plugins.title.text = 'Heart Rate (bpm)' + suffix;
+        charts.speed.options.plugins.title.text = 'Pace (min/km)' + suffix;
+
         Object.values(charts).forEach(c => c.update());
     }
 
