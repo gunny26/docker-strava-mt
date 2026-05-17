@@ -266,7 +266,17 @@
         const legendDiv = document.getElementById(`vals-${id}`);
         if (!legendDiv) return;
         
+        const units = { altitude: 'm', speed: 'min/km', cadence: 'spm', hr: 'bpm' };
+        const unit = units[id] || '';
+        
         let html = "";
+        
+        // Zeige die aktuelle X-Achsen-Position an (Zeit in s oder Distanz in m)
+        const xLabel = xAxisMode === 'time' ? 'Zeit' : 'Distanz';
+        const xUnit = xAxisMode === 'time' ? 's' : 'm';
+        const xValDisplay = xAxisMode === 'time' ? activeX.toFixed(0) : activeX.toFixed(0);
+        html += `<div style="font-weight:bold; margin-bottom:4px; color:#333;">${xLabel}: ${xValDisplay}${xUnit}</div>`;
+
         chart.data.datasets.forEach(ds => {
             if (ds.hidden || ds.data.length === 0) return;
             
@@ -283,8 +293,12 @@
             
             const threshold = xAxisMode === 'distance' ? 100 : 5;
             if (minDiff < threshold) {
-                const val = id === 'speed' ? formatPace(closest.y) : closest.y.toFixed(1);
-                html += `<div style="color:${ds.borderColor}">● ${val}</div>`;
+                let valStr = id === 'speed' ? formatPace(closest.y) : closest.y.toFixed(1);
+                
+                // Wenn eine Referenz aktiv ist, kennzeichnen wir es als Delta (Δ)
+                const prefix = referenceTrackId ? 'Δ ' : '';
+                
+                html += `<div style="color:${ds.borderColor}">● ${ds.label}: ${prefix}${valStr} ${unit}</div>`;
             }
         });
         legendDiv.innerHTML = html;
