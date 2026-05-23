@@ -1,7 +1,6 @@
 import os
-import re
 from typing import Dict, Any
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 import requests
@@ -60,11 +59,15 @@ async def get_activity_stream(activity_id: str, token: str) -> Dict[str, Any]:
         'key_by_type': 'true'
     }
     response = requests.get(url, headers=headers, params=params)
+    
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail="Stream konnte nicht geladen werden.")
+        
     return response.json()
 
 @app.get("/activity-info/{activity_id}")
 async def get_activity_info(activity_id: str, token: str) -> Dict[str, Any]:
-    """Fetch activity info. Fallback to web scraping if API denies access for other users' tracks."""
+    """Fetch activity info from Strava API."""
     headers: Dict[str, str] = {'Authorization': f'Bearer {token}'}
     url: str = f"https://www.strava.com/api/v3/activities/{activity_id}"
     response = requests.get(url, headers=headers)
@@ -72,38 +75,7 @@ async def get_activity_info(activity_id: str, token: str) -> Dict[str, Any]:
     if response.status_code == 200:
         return response.json()
         
-    # Fallback: Scrape public Strava page if API access is denied (e.g. for other users' activities)
-    public_url: str = f"https://www.strava.com/activities/{activity_id}"
-    pub_resp = requests.get(public_url)
-    
-    info: Dict[str, Any] = {
-        "name": f"Activity {activity_id}",
-        "athlete": {"firstname": "Unknown", "lastname": "Athlete"},
-        "start_date": "1970-01-01T00:00:00Z"
-    }
-    
-    if pub_resp.status_code == 200:
-        html: str = pub_resp.text
-        
-        # Extract title and athlete name from <title> tag
-        # Format usually is: <title>Activity Name - Athlete Name's Ride | Strava</title>
-        title_match = re.search(r'<title>(.*?) \| Strava</title>', html)
-        if title_match:
-            full_title: str = title_match.group(1)
-            parts = full_title.split(' - ')
-            if len(parts) >= 2:
-                info["name"] = parts[0].strip()
-                athlete_part: str = parts[1].split("'s")[0]
-                name_parts = athlete_part.strip().split(' ')
-                info["athlete"]["firstname"] = name_parts[0]
-                if len(name_parts) > 1:
-                    info["athlete"]["lastname"] = " ".join(name_parts[1:])
-            else:
-                info["name"] = full_title
-                
-        # Extract date from <time> tag
-        time_match = re.search(r'<time[^>]*datetime="([^"]+)"', html)
-        if time_match:
-            info["start_date"] = time_match.group(1)
-            
-    return info
+    raise HTTPException(
+        status_code=response.status_code, 
+        detail="Aktivität konnte nicht geladen werden (möglicherweise privat oder fremder Nutzer)."
+    )

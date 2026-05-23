@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Strava Multi-Track Analyzer</title>
+    <title>Multi-Track Analyzer für Strava</title>
     <link rel="icon" type="image/png" href="/static/favicon.png">
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -49,7 +49,6 @@
         
         button, select, input { color: var(--text-color); background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 5px; }
         
-        #loginBtn { background: var(--strava-orange); color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .btn-donate { background: #ffc439; color: #333; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; text-decoration: none; display: inline-block; font-size: 0.9rem; }
         .btn-donate:hover { background: #f4bb33; }
         .btn-icon { background: none; border: 1px solid var(--border-color); cursor: pointer; font-size: 1.2rem; padding: 2px 8px; border-radius: 4px; }
@@ -93,7 +92,7 @@
         
         .value-legend { position: absolute; top: 20px; right: 20px; background: var(--legend-bg); color: var(--text-color); padding: 5px; border-radius: 4px; font-size: 0.7rem; pointer-events: none; z-index: 10; border: 1px solid var(--border-light); transition: background-color 0.3s, color 0.3s; }
         
-        footer { background: #222; color: #ccc; padding: 8px; font-size: 0.75rem; text-align: center; }
+        footer { background: #222; color: #ccc; padding: 15px 8px; font-size: 0.75rem; text-align: center; }
         footer a { color: var(--strava-orange); text-decoration: none; margin: 0 10px; }
         footer a:hover { text-decoration: underline; }
         
@@ -212,12 +211,14 @@
 <header>
     <div class="header-left">
         <img src="/static/favicon.png" alt="Logo">
-        <h1>Strava Multi-Track Analyzer</h1>
+        <h1>Multi-Track Analyzer für Strava</h1>
     </div>
     <div class="header-right">
         <button id="themeToggle" class="btn-icon" onclick="toggleTheme()" title="Toggle Dark Mode">🌙</button>
         <a href="https://paypal.me/gunnerysergeant" target="_blank" class="btn-donate" title="Unterstütze dieses Projekt">☕ Spenden</a>
-        <button id="loginBtn" onclick="handleLoginToggle()">Strava verbinden</button>
+        <div id="loginContainer" style="cursor: pointer; display: flex; align-items: center;" onclick="handleLoginToggle()">
+            <img id="loginImg" src="https://d3nn82uaxijpm6.cloudfront.net/assets/api/btn_strava_connectwith_orange-f8d1c992714ee30c6a928b3c02f4406f.png" alt="Connect with Strava" style="height: 30px; border-radius: 4px;">
+        </div>
     </div>
 </header>
 
@@ -282,7 +283,10 @@
 </div>
 
 <footer>
-    &copy; 2026 Strava Multi-Track Analyzer | Tyrol Kliniken RZ Edition
+    <div style="margin-bottom: 10px;">
+        <img src="https://d3nn82uaxijpm6.cloudfront.net/assets/api/api_logo_pwrdBy_strava_horiz_light-df23312f091664228e74060d0b135026.png" alt="Powered by Strava" style="height: 24px;">
+    </div>
+    &copy; 2026 Multi-Track Analyzer | Tyrol Kliniken RZ Edition
     <br>
     <a href="/static/impressum.html">Impressum</a> | <a href="/static/datenschutz.html">Datenschutzerklärung</a>
 </footer>
@@ -375,12 +379,9 @@
     // Token Handling & Login Button Logic
     const urlParams = new URLSearchParams(window.location.hash.replace('#', '?'));
     let stravaToken = urlParams.get('access_token');
-    const loginBtn = document.getElementById('loginBtn');
     
     if(stravaToken) {
-        loginBtn.innerText = "Strava trennen";
-    } else {
-        loginBtn.innerText = "Strava verbinden";
+        document.getElementById('loginContainer').innerHTML = '<button class="btn-primary" onclick="handleLoginToggle()">Strava trennen</button>';
     }
 
     function handleLoginToggle() {
@@ -696,7 +697,9 @@
                 fetch(`/activity-info/${actId}?token=${stravaToken}`)
             ]);
             
-            if (!sRes.ok || !iRes.ok) throw new Error("API Error");
+            if (!sRes.ok || !iRes.ok) {
+                throw new Error("Aktivität konnte nicht geladen werden. Möglicherweise ist sie privat oder gehört einem anderen Nutzer.");
+            }
 
             const stream = await sRes.json();
             const info = await iRes.json();
@@ -742,7 +745,7 @@
             syncGlobal();
             document.getElementById('actIdIn').value = '';
         } catch (e) { 
-            alert("Fehler beim Laden der Aktivität " + actId); 
+            alert(e.message); 
         } finally {
             if (!isBatch) hideLoading();
         }
