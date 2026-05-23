@@ -76,8 +76,8 @@
         <div class="playback-panel">
             <button class="btn-primary" id="playBtn">Play</button>
             <select id="speedMult"><option value="1">1x</option><option value="5" selected>5x</option><option value="20">20x</option></select>
-            <input type="range" id="globalSlider" min="0" max="0" value="0" style="flex:1">
-            <span id="timeDisp" style="font-family:monospace">00:00</span>
+            <input type="range" id="globalSlider" min="0" max="0" value="0" style="flex:1" step="any">
+            <span id="timeDisp" style="font-family:monospace; min-width: 60px; text-align: right;">00:00</span>
             <button onclick="resetZoom()" style="font-size:0.7rem">Reset Zoom</button>
         </div>
         
@@ -181,8 +181,10 @@
     // Settings Functions
     function setXAxis(mode) {
         xAxisMode = mode;
+        recalcMaxDuration();
         updateAllCharts();
         resetZoom();
+        syncGlobal();
     }
 
     function switchTab(tabId, btnElement) {
@@ -412,15 +414,27 @@
 
     function recalcMaxDuration() {
         maxDuration = 0;
+        let maxDistance = 0;
+        
         tracks.forEach(t => {
             if (t.visible) {
                 maxDuration = Math.max(maxDuration, t.cropEnd - t.cropStart);
+                if (t.stream.distance) {
+                    const dStart = getDistanceAtTime(t, t.cropStart);
+                    const dEnd = getDistanceAtTime(t, t.cropEnd);
+                    maxDistance = Math.max(maxDistance, dEnd - dStart);
+                }
             }
         });
-        document.getElementById('globalSlider').max = maxDuration;
-        if (globalTime > maxDuration) {
-            globalTime = maxDuration;
-            document.getElementById('globalSlider').value = globalTime;
+        
+        const slider = document.getElementById('globalSlider');
+        if (xAxisMode === 'time') {
+            slider.max = maxDuration;
+            if (globalTime > maxDuration) {
+                globalTime = maxDuration;
+            }
+        } else {
+            slider.max = maxDistance;
         }
     }
 
@@ -517,6 +531,7 @@
             renderTrackItem(track);
             updateAllCharts();
             map.fitBounds(track.poly.getBounds());
+            syncGlobal();
         } catch (e) { alert("Error loading Activity " + actId); }
     }
 
@@ -582,6 +597,7 @@
         if (t.visible) { t.marker.addTo(map); t.poly.addTo(map); } else { map.removeLayer(t.marker); map.removeLayer(t.poly); }
         recalcMaxDuration();
         updateAllCharts();
+        syncGlobal();
     }
 
     function removeTrack(id) {
@@ -593,6 +609,7 @@
             if (referenceTrackId === id) referenceTrackId = null;
             recalcMaxDuration();
             updateAllCharts();
+            syncGlobal();
         }
     }
 
@@ -713,8 +730,24 @@
                 }
             }
         });
-        document.getElementById('globalSlider').value = globalTime;
-        document.getElementById('timeDisp').innerText = new Date(globalTime * 1000).toISOString().substr(14, 5);
+        
+        const slider = document.getElementById('globalSlider');
+        const disp = document.getElementById('timeDisp');
+        
+        if (xAxisMode === 'time') {
+            slider.value = globalTime;
+            disp.innerText = new Date(globalTime * 1000).toISOString().substr(14, 5);
+        } else {
+            const tr = tracks.find(x => x.visible);
+            let currentDist = 0;
+            if (tr && tr.stream.distance) {
+                const adjustedT = globalTime + tr.cropStart;
+                const distAtCropStart = getDistanceAtTime(tr, tr.cropStart);
+                currentDist = getDistanceAtTime(tr, adjustedT) - distAtCropStart;
+            }
+            slider.value = currentDist;
+            disp.innerText = (currentDist / 1000).toFixed(2) + ' km';
+        }
         
         if (Object.keys(charts).length === 4) {
             Object.values(charts).forEach(c => c.draw());
@@ -795,7 +828,30 @@
     };
 
     document.getElementById('globalSlider').oninput = (e) => {
-        globalTime = parseFloat(e.target.value);
+        const val = parseFloat(e.target.value);
+        if (xAxisMode === 'time') {
+            globalTime = val;
+        } else {
+            const tr = tracks.find(x => x.visible);
+            if (tr && tr.stream.distance) {
+                const dists = tr.stream.distance.data;
+                const times = tr.stream.time.data;
+                const distAtCropStart = getDistanceAtTime(tr, tr.cropStart);
+                const targetDist = val + distAtCropStart;
+                
+                let tVal = times[0];
+                for (let i = 0; i < dists.length - 1; i++) {
+                    if (targetDist >= dists[i] && targetDist <= dists[i+1]) {
+                        const r = (targetDist - dists[i]) / (dists[i+1] - dists[i]);
+                        tVal = times[i] + r * (times[i+1] - times[i]);
+                        break;
+                    }
+                }
+                globalTime = tVal - tr.cropStart;
+            } else {
+                globalTime = val;
+            }
+        }
         hoverTime = null;
         syncGlobal();
     };
