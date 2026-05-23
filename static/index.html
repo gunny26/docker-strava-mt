@@ -592,7 +592,9 @@
                 cropStart: cropStart !== null ? parseFloat(cropStart) : 0,
                 cropEnd: cropEnd !== null ? parseFloat(cropEnd) : maxTime,
                 visible: true,
-                marker: L.circleMarker([0,0], { color: 'white', fillColor: color, fillOpacity: 1, radius: 7 }).addTo(map),
+                marker: L.circleMarker([0,0], { color: 'white', fillColor: color, fillOpacity: 1, radius: 7 })
+                    .bindTooltip(info.name, { permanent: false, direction: 'top' })
+                    .addTo(map),
                 poly: L.polyline(stream.latlng.data, { color, weight: 3, opacity: 0.5 }).addTo(map)
             };
             tracks.push(track);
