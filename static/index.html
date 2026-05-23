@@ -134,9 +134,63 @@
         .dual-range input[type="range"] { position: absolute; width: 100%; pointer-events: none; -webkit-appearance: none; background: transparent; margin: 0; top: 0; height: 20px; outline: none; }
         .dual-range input[type="range"]::-webkit-slider-thumb { pointer-events: all; -webkit-appearance: none; width: 14px; height: 14px; background: var(--strava-orange); border-radius: 50%; cursor: pointer; }
         .dual-range input[type="range"]::-moz-range-thumb { pointer-events: all; width: 14px; height: 14px; background: var(--strava-orange); border-radius: 50%; cursor: pointer; border: none; }
+
+        /* Loading Spinner Overlay */
+        .loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.75); z-index: 3000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+            backdrop-filter: blur(3px);
+        }
+        .loading-overlay.active { opacity: 1; pointer-events: auto; }
+        
+        .hill-scene {
+            position: relative;
+            width: 200px;
+            height: 100px;
+        }
+        .runner-emoji {
+            position: absolute;
+            font-size: 2.5rem;
+            line-height: 1;
+            animation: runUp 1.5s infinite linear;
+            transform-origin: bottom center;
+            z-index: 2;
+        }
+        @keyframes runUp {
+            0% { left: -20px; top: 60px; transform: translateY(0) rotate(20deg); }
+            25% { transform: translateY(-10px) rotate(10deg); }
+            50% { left: 85px; top: -15px; transform: translateY(0) rotate(0deg); }
+            75% { transform: translateY(-10px) rotate(-10deg); }
+            100% { left: 190px; top: 60px; transform: translateY(0) rotate(-20deg); }
+        }
+        .loading-text {
+            margin-top: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--strava-orange);
+            letter-spacing: 2px;
+            animation: pulseText 1.5s infinite;
+        }
+        @keyframes pulseText {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
     </style>
 </head>
 <body>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="loading-overlay">
+    <div class="hill-scene">
+        <svg width="200" height="100" viewBox="0 0 200 100">
+            <path d="M 0 100 Q 100 0 200 100" fill="none" stroke="var(--strava-orange)" stroke-width="4"/>
+        </svg>
+        <div class="runner-emoji">🏃</div>
+    </div>
+    <div class="loading-text">LADE AKTIVITÄT...</div>
+</div>
 
 <!-- Help Modal -->
 <div id="helpModal" class="modal-overlay">
@@ -234,6 +288,20 @@
 </footer>
 
 <script>
+    // Loading Overlay Management
+    let loadingCount = 0;
+    function showLoading() {
+        loadingCount++;
+        document.getElementById('loadingOverlay').classList.add('active');
+    }
+    function hideLoading() {
+        loadingCount--;
+        if (loadingCount <= 0) {
+            loadingCount = 0;
+            document.getElementById('loadingOverlay').classList.remove('active');
+        }
+    }
+
     // Modal Management
     function initHelpModal() {
         const hideHelp = localStorage.getItem('hide_help_modal');
@@ -616,14 +684,11 @@
         return smoothed;
     }
 
-    async function fetchTrack(id = null, cropStart = null, cropEnd = null) {
+    async function fetchTrack(id = null, cropStart = null, cropEnd = null, isBatch = false) {
         const actId = id || document.getElementById('actIdIn').value;
         if (!actId || !stravaToken) return alert("Bitte verbinde zuerst Strava.");
         
-        const addBtn = document.getElementById('addBtn');
-        const originalBtnText = addBtn.innerText;
-        addBtn.innerText = "Lade...";
-        addBtn.disabled = true;
+        if (!isBatch) showLoading();
 
         try {
             const [sRes, iRes] = await Promise.all([
@@ -679,8 +744,7 @@
         } catch (e) { 
             alert("Fehler beim Laden der Aktivität " + actId); 
         } finally {
-            addBtn.innerText = originalBtnText;
-            addBtn.disabled = false;
+            if (!isBatch) hideLoading();
         }
     }
 
@@ -953,10 +1017,17 @@
 
     async function loadSet(idx) {
         if (idx === "") return;
-        const set = JSON.parse(localStorage.getItem('strava_sets'))[idx];
-        document.getElementById('setNameIn').value = set.title;
-        [...tracks].forEach(t => removeTrack(t.id));
-        for (const t of set.tracks) await fetchTrack(t.id, t.cropStart, t.cropEnd);
+        showLoading();
+        try {
+            const set = JSON.parse(localStorage.getItem('strava_sets'))[idx];
+            document.getElementById('setNameIn').value = set.title;
+            [...tracks].forEach(t => removeTrack(t.id));
+            for (const t of set.tracks) {
+                await fetchTrack(t.id, t.cropStart, t.cropEnd, true);
+            }
+        } finally {
+            hideLoading();
+        }
     }
 
     function playLoop() {
