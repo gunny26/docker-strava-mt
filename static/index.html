@@ -124,6 +124,13 @@
             margin-top: 25px; display: flex; justify-content: space-between; align-items: center; 
             border-top: 1px solid var(--border-color); padding-top: 15px;
         }
+
+        /* Dual Range Slider */
+        .dual-range { position: relative; height: 20px; width: 100%; }
+        .dual-range-track { position: absolute; width: 100%; height: 4px; background: var(--border-color); top: 8px; border-radius: 2px; }
+        .dual-range input[type="range"] { position: absolute; width: 100%; pointer-events: none; -webkit-appearance: none; background: transparent; margin: 0; top: 0; height: 20px; outline: none; }
+        .dual-range input[type="range"]::-webkit-slider-thumb { pointer-events: all; -webkit-appearance: none; width: 14px; height: 14px; background: var(--strava-orange); border-radius: 50%; cursor: pointer; }
+        .dual-range input[type="range"]::-moz-range-thumb { pointer-events: all; width: 14px; height: 14px; background: var(--strava-orange); border-radius: 50%; cursor: pointer; border: none; }
     </style>
 </head>
 <body>
@@ -694,17 +701,14 @@
                     <button onclick="toggleVisibility('${t.id}')" id="vis-${t.id}" style="border:none; background:none; cursor:pointer; font-size:1.1rem; padding:0" title="Sichtbarkeit umschalten">👁️</button>
                     <button onclick="setReference('${t.id}')" id="ref-${t.id}" style="border:none; background:none; cursor:pointer; font-size:1.1rem; padding:0; opacity:0.3" title="Als Referenz setzen">🎯</button>
                 </div>
-                <div style="display:flex; flex-direction:column; gap:4px; width:100%;">
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <span style="font-size:0.7rem; width:30px;">Start</span>
-                        <input type="range" id="cropStart-${t.id}" min="0" max="${trackDuration}" value="${t.cropStart}" style="flex:1" oninput="updateCrop('${t.id}', 'start', this.value)">
-                        <span id="startval-${t.id}" style="font-size:0.7rem; font-weight:bold; width:35px; text-align:right;">${t.cropStart}s</span>
+                <div style="display:flex; align-items:center; gap:8px; width:100%; margin-top: 5px;">
+                    <span id="startval-${t.id}" style="font-size:0.7rem; font-weight:bold; width:35px; text-align:right;">${t.cropStart}s</span>
+                    <div class="dual-range" style="flex:1;">
+                        <div class="dual-range-track"></div>
+                        <input type="range" id="cropStart-${t.id}" min="0" max="${trackDuration}" value="${t.cropStart}" oninput="updateCrop('${t.id}', 'start', this.value)">
+                        <input type="range" id="cropEnd-${t.id}" min="0" max="${trackDuration}" value="${t.cropEnd}" oninput="updateCrop('${t.id}', 'end', this.value)">
                     </div>
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <span style="font-size:0.7rem; width:30px;">End</span>
-                        <input type="range" id="cropEnd-${t.id}" min="0" max="${trackDuration}" value="${t.cropEnd}" style="flex:1" oninput="updateCrop('${t.id}', 'end', this.value)">
-                        <span id="endval-${t.id}" style="font-size:0.7rem; font-weight:bold; width:35px; text-align:right;">${t.cropEnd}s</span>
-                    </div>
+                    <span id="endval-${t.id}" style="font-size:0.7rem; font-weight:bold; width:35px; text-align:left;">${t.cropEnd}s</span>
                 </div>
             </div>
         `;
