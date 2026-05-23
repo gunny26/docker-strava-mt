@@ -13,48 +13,92 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <style>
-        :root { --strava-orange: #fc4c02; --sidebar-width: 320px; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: #f0f2f5; overflow: hidden; }
-        header { background: white; padding: 5px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--strava-orange); box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 100; }
+        /* Theme Variables */
+        :root { 
+            --strava-orange: #fc4c02; 
+            --sidebar-width: 320px;
+            --bg-color: #f0f2f5;
+            --surface-color: #ffffff;
+            --text-color: #333333;
+            --text-muted: #666666;
+            --border-color: #dddddd;
+            --border-light: #eeeeee;
+            --tab-bg: #f9f9f9;
+            --tab-hover: #f0f0f0;
+            --legend-bg: rgba(255,255,255,0.9);
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #121212;
+            --surface-color: #1e1e1e;
+            --text-color: #e0e0e0;
+            --text-muted: #aaaaaa;
+            --border-color: #333333;
+            --border-light: #2a2a2a;
+            --tab-bg: #1a1a1a;
+            --tab-hover: #2d2d2d;
+            --legend-bg: rgba(30,30,30,0.9);
+        }
+
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: var(--bg-color); color: var(--text-color); overflow: hidden; transition: background-color 0.3s, color 0.3s; }
+        
+        header { background: var(--surface-color); padding: 5px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--strava-orange); box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 100; transition: background-color 0.3s; }
         .header-left { display: flex; align-items: center; gap: 15px; }
         header img { height: 30px; border-radius: 4px; }
         .header-right { display: flex; align-items: center; gap: 10px; }
+        
+        button, select, input { color: var(--text-color); background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 5px; }
+        
         #loginBtn { background: var(--strava-orange); color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .btn-donate { background: #ffc439; color: #333; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; text-decoration: none; display: inline-block; font-size: 0.9rem; }
         .btn-donate:hover { background: #f4bb33; }
+        .btn-icon { background: none; border: 1px solid var(--border-color); cursor: pointer; font-size: 1.2rem; padding: 2px 8px; border-radius: 4px; }
+        
         .main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
         
-        /* Sidebar on the right */
-        #sidebar { width: var(--sidebar-width); background: white; border-left: 1px solid #ccc; transition: margin-right 0.3s ease; overflow-y: auto; display: flex; flex-direction: column; z-index: 50; margin-right: 0; }
+        /* Sidebar */
+        #sidebar { width: var(--sidebar-width); background: var(--surface-color); border-left: 1px solid var(--border-color); transition: margin-right 0.3s ease, background-color 0.3s; overflow-y: auto; display: flex; flex-direction: column; z-index: 50; margin-right: 0; }
         #sidebar.collapsed { margin-right: calc(var(--sidebar-width) * -1); }
         .sidebar-content { padding: 15px; display: flex; flex-direction: column; gap: 15px; }
         
-        /* Toggle button adjusted for right side */
-        .sidebar-toggle { position: absolute; right: var(--sidebar-width); top: 10px; z-index: 1000; background: white; border: 1px solid #ccc; padding: 5px; cursor: pointer; border-radius: 4px 0 0 4px; transition: right 0.3s ease; }
+        .sidebar-toggle { position: absolute; right: var(--sidebar-width); top: 10px; z-index: 1000; background: var(--surface-color); color: var(--text-color); border: 1px solid var(--border-color); padding: 5px; cursor: pointer; border-radius: 4px 0 0 4px; transition: right 0.3s ease; }
         #sidebar.collapsed + .sidebar-toggle { right: 0; }
         
-        .track-item { background: #fff; border: 1px solid #ddd; padding: 10px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .track-item { background: var(--surface-color); border: 1px solid var(--border-color); padding: 10px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .content-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-        #map { height: 35vh; width: 100%; border-bottom: 1px solid #ccc; flex-shrink: 0; }
-        .playback-panel { background: white; padding: 10px 20px; border-bottom: 1px solid #ddd; display: flex; align-items: center; gap: 15px; flex-shrink: 0; }
+        
+        /* Map Dark Mode Filter */
+        #map { height: 35vh; width: 100%; border-bottom: 1px solid var(--border-color); flex-shrink: 0; background: var(--bg-color); }
+        [data-theme="dark"] .leaflet-layer,
+        [data-theme="dark"] .leaflet-control-zoom-in,
+        [data-theme="dark"] .leaflet-control-zoom-out,
+        [data-theme="dark"] .leaflet-control-attribution {
+            filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+        }
+
+        .playback-panel { background: var(--surface-color); padding: 10px 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 15px; flex-shrink: 0; transition: background-color 0.3s; }
         
         /* Tabs Layout */
-        .charts-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: white; }
-        .tabs { display: flex; background: #f9f9f9; border-bottom: 1px solid #ddd; flex-shrink: 0; }
-        .tab-btn { flex: 1; padding: 10px; border: none; background: none; cursor: pointer; font-weight: bold; color: #666; border-bottom: 3px solid transparent; transition: all 0.2s; }
-        .tab-btn:hover { color: var(--strava-orange); background: #f0f0f0; }
-        .tab-btn.active { color: var(--strava-orange); border-bottom-color: var(--strava-orange); background: white; }
+        .charts-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--surface-color); transition: background-color 0.3s; }
+        .tabs { display: flex; background: var(--tab-bg); border-bottom: 1px solid var(--border-color); flex-shrink: 0; transition: background-color 0.3s; }
+        .tab-btn { flex: 1; padding: 10px; border: none; background: none; cursor: pointer; font-weight: bold; color: var(--text-muted); border-bottom: 3px solid transparent; transition: all 0.2s; }
+        .tab-btn:hover { color: var(--strava-orange); background: var(--tab-hover); }
+        .tab-btn.active { color: var(--strava-orange); border-bottom-color: var(--strava-orange); background: var(--surface-color); }
         
         .chart-box { display: none; flex: 1; padding: 15px; position: relative; min-height: 0; }
         .chart-box.active { display: block; }
         
-        .value-legend { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 4px; font-size: 0.7rem; pointer-events: none; z-index: 10; border: 1px solid #eee; }
-        footer { background: #333; color: #ccc; padding: 5px; font-size: 0.7rem; text-align: center; }
+        .value-legend { position: absolute; top: 20px; right: 20px; background: var(--legend-bg); color: var(--text-color); padding: 5px; border-radius: 4px; font-size: 0.7rem; pointer-events: none; z-index: 10; border: 1px solid var(--border-light); transition: background-color 0.3s, color 0.3s; }
+        
+        footer { background: #222; color: #ccc; padding: 8px; font-size: 0.75rem; text-align: center; }
+        footer a { color: var(--strava-orange); text-decoration: none; margin: 0 10px; }
+        footer a:hover { text-decoration: underline; }
+        
         .btn-primary { background: var(--strava-orange); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; }
         
-        .settings-group { background: #f9f9f9; padding: 10px; border-radius: 6px; border: 1px solid #eee; }
-        .settings-group h5 { margin: 0 0 8px 0; font-size: 0.85rem; color: #333; }
-        .settings-row { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; margin-bottom: 4px; }
+        .settings-group { background: var(--tab-bg); padding: 10px; border-radius: 6px; border: 1px solid var(--border-light); transition: background-color 0.3s; }
+        .settings-group h5 { margin: 0 0 8px 0; font-size: 0.85rem; color: var(--text-color); }
+        .settings-row { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; margin-bottom: 4px; color: var(--text-color); }
     </style>
 </head>
 <body>
@@ -65,6 +109,7 @@
         <h1>Strava Multi-Track Analyzer</h1>
     </div>
     <div class="header-right">
+        <button id="themeToggle" class="btn-icon" onclick="toggleTheme()" title="Toggle Dark Mode">🌙</button>
         <a href="https://paypal.me/gunnerysergeant" target="_blank" class="btn-donate" title="Unterstütze dieses Projekt">☕ Spenden</a>
         <button id="loginBtn" onclick="handleLoginToggle()">Strava verbinden</button>
     </div>
@@ -99,7 +144,7 @@
         <div class="sidebar-content">
             <div style="display:flex; gap:5px;">
                 <input type="text" id="actIdIn" placeholder="Activity ID" style="flex:1">
-                <button class="btn-primary" onclick="fetchTrack()">Add</button>
+                <button class="btn-primary" id="addBtn" onclick="fetchTrack()">Add</button>
             </div>
             <div id="trackList"></div>
             
@@ -112,7 +157,7 @@
                 </div>
             </div>
 
-            <hr style="width:100%; border:0; border-top:1px solid #eee;">
+            <hr style="width:100%; border:0; border-top:1px solid var(--border-color);">
             
             <div style="display:flex; flex-direction:column; gap:8px;">
                 <input type="text" id="setNameIn" placeholder="Set Title">
@@ -127,9 +172,55 @@
     <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
 </div>
 
-<footer>&copy; 2026 Strava Multi-Track Analyzer | Tyrol Kliniken RZ Edition</footer>
+<footer>
+    &copy; 2026 Strava Multi-Track Analyzer | Tyrol Kliniken RZ Edition
+    <br>
+    <a href="#">Impressum</a> | <a href="#">Datenschutzerklärung</a>
+</footer>
 
 <script>
+    // Theme Management
+    function initTheme() {
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.body.setAttribute('data-theme', savedTheme);
+        document.getElementById('themeToggle').innerText = savedTheme === 'dark' ? '☀️' : '🌙';
+        updateChartColors();
+    }
+
+    function toggleTheme() {
+        const body = document.body;
+        const currentTheme = body.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        body.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        document.getElementById('themeToggle').innerText = newTheme === 'dark' ? '☀️' : '🌙';
+        updateChartColors();
+    }
+
+    function updateChartColors() {
+        const isDark = document.body.getAttribute('data-theme') === 'dark';
+        const textColor = isDark ? '#e0e0e0' : '#666';
+        const gridColor = isDark ? '#333333' : '#e5e5e5';
+
+        Chart.defaults.color = textColor;
+        Chart.defaults.scale.grid.color = gridColor;
+
+        Object.values(charts).forEach(chart => {
+            if(chart.options.scales.x) {
+                chart.options.scales.x.ticks.color = textColor;
+                chart.options.scales.x.grid.color = gridColor;
+            }
+            if(chart.options.scales.y) {
+                chart.options.scales.y.ticks.color = textColor;
+                chart.options.scales.y.grid.color = gridColor;
+            }
+            if(chart.options.plugins.title) {
+                chart.options.plugins.title.color = textColor;
+            }
+            chart.update();
+        });
+    }
+
     // Global State
     let tracks = [];
     let charts = {}; 
@@ -166,16 +257,16 @@
     
     const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     });
 
     const topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
         maxZoom: 17,
-        attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+        attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     });
 
     osmLayer.addTo(map);
-    const baseMaps = { "OpenStreetMap": osmLayer, "OpenTopoMap (Höhenlinien)": topoLayer };
+    const baseMaps = { "OpenStreetMap": osmLayer, "OpenTopoMap": topoLayer };
     L.control.layers(baseMaps).addTo(map);
 
     // Settings Functions
@@ -214,7 +305,6 @@
         return 0;
     }
 
-    // Helper to get distance from time for the first visible track
     function getActiveX() {
         let t = hoverTime !== null ? hoverTime : globalTime;
         if (xAxisMode === 'time') return t;
@@ -243,7 +333,7 @@
                 ctx.save();
                 ctx.setLineDash([5, 5]);
                 ctx.lineWidth = 1.5;
-                ctx.strokeStyle = hoverTime !== null ? 'rgba(0,0,0,0.5)' : '#fc4c02';
+                ctx.strokeStyle = hoverTime !== null ? 'rgba(150,150,150,0.8)' : '#fc4c02';
                 ctx.beginPath();
                 ctx.moveTo(xPixel, y.top);
                 ctx.lineTo(xPixel, y.bottom);
@@ -272,17 +362,15 @@
         const unit = units[id] || '';
         
         let html = "";
-        
-        // Zeige die aktuelle X-Achsen-Position an (Zeit in s oder Distanz in m)
         const xLabel = xAxisMode === 'time' ? 'Zeit' : 'Distanz';
         const xUnit = xAxisMode === 'time' ? 's' : 'm';
-        const xValDisplay = xAxisMode === 'time' ? activeX.toFixed(0) : activeX.toFixed(0);
-        html += `<div style="font-weight:bold; margin-bottom:4px; color:#333;">${xLabel}: ${xValDisplay}${xUnit}</div>`;
+        const xValDisplay = activeX.toFixed(0);
+        
+        html += `<div style="font-weight:bold; margin-bottom:4px;">${xLabel}: ${xValDisplay}${xUnit}</div>`;
 
         chart.data.datasets.forEach(ds => {
             if (ds.hidden || ds.data.length === 0) return;
             
-            // Find closest point
             let closest = ds.data[0];
             let minDiff = Math.abs(closest.x - activeX);
             for(let i=1; i<ds.data.length; i++) {
@@ -296,10 +384,7 @@
             const threshold = xAxisMode === 'distance' ? 100 : 5;
             if (minDiff < threshold) {
                 let valStr = id === 'speed' ? formatPace(closest.y) : closest.y.toFixed(1);
-                
-                // Wenn eine Referenz aktiv ist, kennzeichnen wir es als Delta (Δ)
                 const prefix = referenceTrackId ? 'Δ ' : '';
-                
                 html += `<div style="color:${ds.borderColor}">● ${ds.label}: ${prefix}${valStr} ${unit}</div>`;
             }
         });
@@ -354,7 +439,6 @@
                         if (xAxisMode === 'time') {
                             hoverTime = hoveredX;
                         } else {
-                            // Convert distance back to time
                             const tr = tracks.find(t => t.visible);
                             if (tr && tr.stream.distance) {
                                 const dists = tr.stream.distance.data;
@@ -446,13 +530,11 @@
             let count = 0;
             const targetTime = times[i];
             
-            // Rückwärts schauen
             for (let j = i; j >= 0; j--) {
                 if (targetTime - times[j] > halfWindow) break;
                 sum += data[j];
                 count++;
             }
-            // Vorwärts schauen
             for (let j = i + 1; j < data.length; j++) {
                 if (times[j] - targetTime > halfWindow) break;
                 sum += data[j];
@@ -465,23 +547,29 @@
 
     async function fetchTrack(id = null, cropStart = null, cropEnd = null) {
         const actId = id || document.getElementById('actIdIn').value;
-        if (!actId || !stravaToken) return alert("Please Connect Strava");
+        if (!actId || !stravaToken) return alert("Bitte verbinde zuerst Strava.");
+        
+        const addBtn = document.getElementById('addBtn');
+        const originalBtnText = addBtn.innerText;
+        addBtn.innerText = "Lade...";
+        addBtn.disabled = true;
+
         try {
             const [sRes, iRes] = await Promise.all([
                 fetch(`/stream/${actId}?token=${stravaToken}`),
                 fetch(`/activity-info/${actId}?token=${stravaToken}`)
             ]);
+            
+            if (!sRes.ok || !iRes.ok) throw new Error("API Error");
+
             const stream = await sRes.json();
             const info = await iRes.json();
             
-            // Glättung (Moving Average) für Geschwindigkeit und Schrittfrequenz
             if (stream.time && stream.time.data) {
                 if (stream.velocity_smooth && stream.velocity_smooth.data) {
-                    // 15 Sekunden Fenster für Geschwindigkeit
                     stream.velocity_smooth.data = calculateCenteredMovingAverage(stream.velocity_smooth.data, stream.time.data, 15);
                 }
                 if (stream.cadence && stream.cadence.data) {
-                    // 10 Sekunden Fenster für Schrittfrequenz
                     stream.cadence.data = calculateCenteredMovingAverage(stream.cadence.data, stream.time.data, 10);
                 }
             }
@@ -491,24 +579,6 @@
             let athleteName = 'Unknown';
             if (info.athlete && info.athlete.firstname) {
                 athleteName = `${info.athlete.firstname} ${info.athlete.lastname || ''}`.trim();
-            } else if (stravaToken) {
-                try {
-                    const athRes = await fetch('https://www.strava.com/api/v3/athlete', {
-                        headers: { 'Authorization': `Bearer ${stravaToken}` }
-                    });
-                    if (athRes.ok) {
-                        const athData = await athRes.json();
-                        if (!info.athlete || info.athlete.id === athData.id) {
-                            athleteName = `${athData.firstname} ${athData.lastname || ''}`.trim();
-                        } else {
-                            athleteName = `Athlete ID: ${info.athlete.id}`;
-                        }
-                    } else if (info.athlete && info.athlete.id) {
-                        athleteName = `Athlete ID: ${info.athlete.id}`;
-                    }
-                } catch (e) {
-                    if (info.athlete && info.athlete.id) athleteName = `Athlete ID: ${info.athlete.id}`;
-                }
             } else if (info.athlete && info.athlete.id) {
                 athleteName = `Athlete ID: ${info.athlete.id}`;
             }
@@ -532,7 +602,13 @@
             updateAllCharts();
             map.fitBounds(track.poly.getBounds());
             syncGlobal();
-        } catch (e) { alert("Error loading Activity " + actId); }
+            document.getElementById('actIdIn').value = '';
+        } catch (e) { 
+            alert("Fehler beim Laden der Aktivität " + actId); 
+        } finally {
+            addBtn.innerText = originalBtnText;
+            addBtn.disabled = false;
+        }
     }
 
     function renderTrackItem(t) {
@@ -546,11 +622,11 @@
         div.innerHTML = `
             <h4 style="margin:0; display:flex; justify-content:space-between; align-items:flex-start;">
                 <span style="flex:1">${t.name}</span>
-                <button onclick="removeTrack('${t.id}')" style="border:none; background:none; cursor:pointer; font-size:1rem; padding:0 0 0 10px">✕</button>
+                <button onclick="removeTrack('${t.id}')" style="border:none; background:none; cursor:pointer; font-size:1rem; padding:0 0 0 10px; color:var(--text-color)">✕</button>
             </h4>
-            <div style="font-size:0.75rem; color:#444; font-weight:bold; margin:2px 0">${t.athlete}</div>
+            <div style="font-size:0.75rem; color:var(--text-muted); font-weight:bold; margin:2px 0">${t.athlete}</div>
             <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size:0.7rem; color:#666">${t.date}</span>
+                <span style="font-size:0.7rem; color:var(--text-muted)">${t.date}</span>
                 <a href="https://www.strava.com/activities/${t.id}" target="_blank" style="font-size:0.7rem; color:var(--strava-orange); text-decoration:none;">View on Strava ↗</a>
             </div>
             <div style="margin-top:8px; display:flex; flex-direction:column; gap:8px;">
@@ -856,6 +932,8 @@
         syncGlobal();
     };
 
+    // Initialize
+    initTheme();
     loadSavedSetsList();
 </script>
 </body>
