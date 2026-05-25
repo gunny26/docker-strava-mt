@@ -56,7 +56,7 @@ Damit der Workflow das Docker Image in die GitHub Container Registry pushen kann
    ```env
    STRAVA_CLIENT_ID=deine_prod_client_id
    STRAVA_CLIENT_SECRET=deine_prod_client_secret
-   STRAVA_REDIRECT_URI=https://deinedomain.com/callback
+   STRAVA_REDIRECT_URI=https://multi-track-analyzer.messner.click/callback
    ```
 
 ## Installation & Usage
