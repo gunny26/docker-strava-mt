@@ -49,12 +49,17 @@ docker run --rm \
 # Docker Compose mit Produktionskonfiguration starten
 docker compose -f docker-compose-prod.yml up -d --pull always
 
-# Warte 5 Sekunden für HAProxy-Initialisierung
-sleep 5
+# Kombiniertes Zertifikat erstellen und ins Volume kopieren
+if [ ! -f "/etc/letsencrypt/live/$LETSENCRYPT_DOMAIN/fullchain.pem" ]; then
+  echo "Erstelle initiales Let's Encrypt Zertifikat..."
+  sudo certbot certonly --standalone -d "$LETSENCRYPT_DOMAIN" \
+    --non-interactive \
+    --agree-tos \
+    --email "$LETSENCRYPT_EMAIL" \
+    --keep-until-expiring
+fi
 
-# Certbot-Zertifikat erstellen/erneuern
-echo "Initialisiere Let's Encrypt Zertifikat..."
-docker compose -f docker-compose-prod.yml run --rm certbot sh -c "certbot certonly --standalone -d $LETSENCRYPT_DOMAIN --non-interactive --agree-tos --email $LETSENCRYPT_EMAIL --keep-until-expiring && cat /etc/letsencrypt/live/$LETSENCRYPT_DOMAIN/fullchain.pem /etc/letsencrypt/live/$LETSENCRYPT_DOMAIN/privkey.pem > /etc/letsencrypt/messner.click.pem"
+./renew_certs.sh
 
 echo "Anwendung erfolgreich gestartet!"
 echo "Zugriff: $STRAVA_REDIRECT_URI"
