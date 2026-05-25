@@ -18,11 +18,28 @@ services:
       - "443:443"
     volumes:
       - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
-      - certs:/etc/ssl/certs:ro
+      - certs:/etc/ssl/certs:rw
     depends_on:
       - app
     networks:
       - backend
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - certs:/etc/letsencrypt
+    command: >
+      sh -c "certbot certonly --standalone -d multi-track-analyzer.messner.click
+      --non-interactive --agree-tos --email your@email.com
+      --keep-until-expiring
+      && cat /etc/letsencrypt/live/multi-track-analyzer.messner.click/fullchain.pem 
+      /etc/letsencrypt/live/multi-track-analyzer.messner.click/privkey.pem > 
+      /etc/letsencrypt/messner.click.pem"
+    networks:
+      - backend
+    depends_on:
+      - haproxy
+    restart: unless-stopped
 
 networks:
   backend:
