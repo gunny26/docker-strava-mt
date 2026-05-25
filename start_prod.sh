@@ -48,7 +48,7 @@ if [ ! -f "/etc/letsencrypt/live/$LETSENCRYPT_DOMAIN/fullchain.pem" ]; then
     --keep-until-expiring
 fi
 
-# Certbot-Skript als root ausführen
+# Kombiniertes Zertifikat erstellen und ins Volume kopieren
 sudo ./renew_certs.sh
 
 echo "Anwendung erfolgreich gestartet!"
