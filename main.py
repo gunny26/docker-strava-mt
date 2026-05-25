@@ -1,6 +1,6 @@
 import os
 from typing import Dict, Any
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 import requests
@@ -50,8 +50,18 @@ async def callback(code: str) -> RedirectResponse:
     return RedirectResponse(url=f"/#access_token={access_token}")
 
 @app.get("/stream/{activity_id}")
-async def get_activity_stream(activity_id: str, token: str) -> Dict[str, Any]:
+async def get_activity_stream(
+    activity_id: str, 
+    authorization: str = Header(None, alias="Authorization")
+) -> Dict[str, Any]:
     """Fetch the activity stream data from Strava API."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=401, 
+            detail="Authorization header fehlt oder ist ungültig"
+        )
+    
+    token = authorization.split(" ")[1]
     headers: Dict[str, str] = {'Authorization': f'Bearer {token}'}
     url: str = f"https://www.strava.com/api/v3/activities/{activity_id}/streams"
     params: Dict[str, str] = {
@@ -66,8 +76,18 @@ async def get_activity_stream(activity_id: str, token: str) -> Dict[str, Any]:
     return response.json()
 
 @app.get("/activity-info/{activity_id}")
-async def get_activity_info(activity_id: str, token: str) -> Dict[str, Any]:
+async def get_activity_info(
+    activity_id: str, 
+    authorization: str = Header(None, alias="Authorization")
+) -> Dict[str, Any]:
     """Fetch activity info from Strava API."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=401, 
+            detail="Authorization header fehlt oder ist ungültig"
+        )
+    
+    token = authorization.split(" ")[1]
     headers: Dict[str, str] = {'Authorization': f'Bearer {token}'}
     url: str = f"https://www.strava.com/api/v3/activities/{activity_id}"
     response = requests.get(url, headers=headers)
