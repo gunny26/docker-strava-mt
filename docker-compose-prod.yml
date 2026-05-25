@@ -4,8 +4,12 @@ services:
   app:
     image: ghcr.io/dein-github-name/strava-mt-app:latest
     restart: always
-    env_file: .env
-    # Port 8000 muss nicht nach außen offen sein, HAProxy übernimmt das
+    networks:
+      - backend
+    environment:
+      - STRAVA_CLIENT_ID=${STRAVA_CLIENT_ID}
+      - STRAVA_CLIENT_SECRET=${STRAVA_CLIENT_SECRET}
+      - STRAVA_REDIRECT_URI=${STRAVA_REDIRECT_URI}
 
   haproxy:
     image: haproxy:latest
@@ -14,6 +18,16 @@ services:
       - "443:443"
     volumes:
       - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
-      - ./certs:/etc/ssl/certs:ro
+      - certs:/etc/ssl/certs:ro
     depends_on:
       - app
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  certs:
+    external: true
