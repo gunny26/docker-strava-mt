@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   app:
-    image: ghcr.io/dein-github-name/strava-mt-app:latest
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/strava-mt-app:latest
     restart: always
     networks:
       - backend
