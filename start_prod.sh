@@ -32,24 +32,13 @@ echo "Generiere Zertifikat für Domain: $DOMAIN"
 # Bei GitHub Container Registry anmelden
 echo "$GHCR_TOKEN" | docker login ghcr.io -u $GITHUB_REPOSITORY_OWNER --password-stdin
 
-# Zertifikats-Volume erstellen (falls nicht vorhanden)
-docker volume create certs > /dev/null 2>&1 || true
-
-# Verzeichnis für ACME-Tokens erstellen
-docker run --rm \
-    -v certs:/target \
-    alpine mkdir -p /target/acme
-
-# Lua-Skript in Volume kopieren
-docker run --rm \
-    -v certs:/target \
-    -v "$(pwd)/letsencrypt:/source" \
-    alpine cp /source/acme-http01.lua /target/
+# Cert-Verzeichnis erstellen
+mkdir -p certs
 
 # Docker Compose mit Produktionskonfiguration starten
 docker compose -f docker-compose-prod.yml up -d --pull always
 
-# Kombiniertes Zertifikat erstellen und ins Volume kopieren
+# Initiales Zertifikat erstellen
 if [ ! -f "/etc/letsencrypt/live/$LETSENCRYPT_DOMAIN/fullchain.pem" ]; then
   echo "Erstelle initiales Let's Encrypt Zertifikat..."
   sudo certbot certonly --standalone -d "$LETSENCRYPT_DOMAIN" \
@@ -59,7 +48,8 @@ if [ ! -f "/etc/letsencrypt/live/$LETSENCRYPT_DOMAIN/fullchain.pem" ]; then
     --keep-until-expiring
 fi
 
-./renew_certs.sh
+# Certbot-Skript als root ausführen
+sudo ./renew_certs.sh
 
 echo "Anwendung erfolgreich gestartet!"
 echo "Zugriff: $STRAVA_REDIRECT_URI"

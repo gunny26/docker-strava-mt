@@ -18,7 +18,7 @@ services:
       - "443:443"
     volumes:
       - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
-      - certs:/etc/ssl/certs:rw
+      - ./certs:/etc/ssl/certs:ro
     depends_on:
       - app
     networks:
@@ -28,7 +28,3 @@ services:
 networks:
   backend:
     driver: bridge
-
-volumes:
-  certs:
-    external: true
