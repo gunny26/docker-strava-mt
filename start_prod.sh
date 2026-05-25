@@ -49,5 +49,12 @@ docker run --rm \
 # Docker Compose mit Produktionskonfiguration starten
 docker compose -f docker-compose-prod.yml up -d --pull always
 
+# Warte 5 Sekunden für HAProxy-Initialisierung
+sleep 5
+
+# Certbot-Zertifikat erstellen/erneuern
+echo "Initialisiere Let's Encrypt Zertifikat..."
+docker compose -f docker-compose-prod.yml run --rm certbot
+
 echo "Anwendung erfolgreich gestartet!"
 echo "Zugriff: $STRAVA_REDIRECT_URI"
