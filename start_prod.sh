@@ -54,7 +54,7 @@ sleep 5
 
 # Certbot-Zertifikat erstellen/erneuern
 echo "Initialisiere Let's Encrypt Zertifikat..."
-docker compose -f docker-compose-prod.yml run --rm certbot
+docker compose -f docker-compose-prod.yml run --rm certbot sh -c "certbot certonly --standalone -d $LETSENCRYPT_DOMAIN --non-interactive --agree-tos --email $LETSENCRYPT_EMAIL --keep-until-expiring && cat /etc/letsencrypt/live/$LETSENCRYPT_DOMAIN/fullchain.pem /etc/letsencrypt/live/$LETSENCRYPT_DOMAIN/privkey.pem > /etc/letsencrypt/messner.click.pem"
 
 echo "Anwendung erfolgreich gestartet!"
 echo "Zugriff: $STRAVA_REDIRECT_URI"

@@ -31,13 +31,7 @@ services:
     environment:
       - LETSENCRYPT_DOMAIN
       - LETSENCRYPT_EMAIL
-    command: >
-      sh -c "certbot certonly --standalone -d $${LETSENCRYPT_DOMAIN}
-      --non-interactive --agree-tos --email $${LETSENCRYPT_EMAIL}
-      --keep-until-expiring
-      && cat /etc/letsencrypt/live/$${LETSENCRYPT_DOMAIN}/fullchain.pem
-      /etc/letsencrypt/live/$${LETSENCRYPT_DOMAIN}/privkey.pem >
-      /etc/letsencrypt/messner.click.pem"
+    command: sh -c "certbot certonly --standalone -d $${LETSENCRYPT_DOMAIN} --non-interactive --agree-tos --email $${LETSENCRYPT_EMAIL} --keep-until-expiring && cat /etc/letsencrypt/live/$${LETSENCRYPT_DOMAIN}/fullchain.pem /etc/letsencrypt/live/$${LETSENCRYPT_DOMAIN}/privkey.pem > /etc/letsencrypt/messner.click.pem"
     networks:
       - backend
     depends_on:
