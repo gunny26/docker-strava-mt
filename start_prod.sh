@@ -25,14 +25,43 @@ for var in "${required_vars[@]}"; do
     fi
 done
 
+# Domain aus Redirect-URI extrahieren
+DOMAIN=$(echo "$STRAVA_REDIRECT_URI" | sed -E 's|https?://([^/]+).*|\1|')
+echo "Generiere Zertifikat für Domain: $DOMAIN"
+
 # Bei GitHub Container Registry anmelden
 echo "$GHCR_TOKEN" | docker login ghcr.io -u $GITHUB_REPOSITORY_OWNER --password-stdin
 
 # Zertifikats-Volume erstellen (falls nicht vorhanden)
 docker volume create certs > /dev/null 2>&1 || true
 
+# Temporäres Verzeichnis für Zertifikate erstellen
+CERT_DIR=$(mktemp -d)
+echo "Erstelle temporäres Zertifikatsverzeichnis: $CERT_DIR"
+
+# Self-signed Zertifikat generieren
+openssl req -x509 -newkey rsa:2048 \
+    -keyout "$CERT_DIR/dummy.key" \
+    -out "$CERT_DIR/dummy.crt" \
+    -days 365 \
+    -nodes \
+    -subj "/CN=$DOMAIN"
+
+# Zertifikate kombinieren
+cat "$CERT_DIR/dummy.crt" "$CERT_DIR/dummy.key" > "$CERT_DIR/messner.click.pem"
+
+# Zertifikat in Docker-Volume kopieren
+docker run --rm \
+    -v certs:/target \
+    -v "$CERT_DIR:/source" \
+    alpine cp /source/messner.click.pem /target/
+
+# Aufräumen
+rm -rf "$CERT_DIR"
+echo "Zertifikat erfolgreich in Volume kopiert"
+
 # Docker Compose mit Produktionskonfiguration starten
 docker compose -f docker-compose-prod.yml up -d --pull always
 
 echo "Anwendung erfolgreich gestartet!"
-echo "Zugriff: https://multi-track-analyzer.messner.click"
+echo "Zugriff: $STRAVA_REDIRECT_URI"
