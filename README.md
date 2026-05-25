@@ -27,6 +27,38 @@ You need to create a Strava API Application at [strava.com/settings/api](https:/
 - **Authorization Domain:** `localhost` (for local testing) or your own domain (e.g., `messner.click`).
 - **Callback URL:** Should match your `STRAVA_REDIRECT_URI` in the `.env` file.
 
+## GitHub Actions Konfiguration
+
+Damit der Workflow das Docker Image in die GitHub Container Registry pushen kann, müssen folgende Einstellungen im GitHub Repository vorgenommen werden:
+
+1. **Workflow Permissions anpassen:**
+   - Gehe zu deinem Repository auf GitHub
+   - Klicke auf `Settings` > `Actions` > `General`
+   - Scrolle zu `Workflow permissions`
+   - Wähle `Read and write permissions` aus
+   - Aktiviere die Checkbox `Allow GitHub Actions to create and approve pull requests`
+   - Klicke auf `Save`
+
+2. **Image auf Produktionsserver laden:**
+   ```bash
+   # 1. Anmeldung bei GitHub Container Registry
+   echo "DEIN_GITHUB_TOKEN" | docker login ghcr.io -u DEIN_GITHUB_USERNAME --password-stdin
+   
+   # 2. Image herunterladen
+   docker pull ghcr.io/DEIN_GITHUB_USERNAME/strava-mt-app:latest
+   ```
+   Ersetze:
+   - `DEIN_GITHUB_TOKEN` mit deinem [Personal Access Token](https://github.com/settings/tokens) (Scopes: `read:packages`)
+   - `DEIN_GITHUB_USERNAME` mit deinem GitHub Benutzernamen
+
+3. **Umgebungsvariablen für Produktion:**
+   Erstelle eine `.env.prod` Datei auf deinem Server:
+   ```env
+   STRAVA_CLIENT_ID=deine_prod_client_id
+   STRAVA_CLIENT_SECRET=deine_prod_client_secret
+   STRAVA_REDIRECT_URI=https://deinedomain.com/callback
+   ```
+
 ## Installation & Usage
 
 1. **Clone the repository:**
