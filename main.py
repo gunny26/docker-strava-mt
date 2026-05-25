@@ -17,6 +17,11 @@ async def read_index() -> FileResponse:
     """Return the main index.html file."""
     return FileResponse('static/index.html')
 
+@app.get("/health")
+async def health_check() -> Dict[str, str]:
+    """Health check endpoint for HAProxy."""
+    return {"status": "ok"}
+
 @app.get("/login")
 async def login() -> RedirectResponse:
     """Redirect user to Strava OAuth login page."""
