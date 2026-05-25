@@ -51,12 +51,16 @@ Damit der Workflow das Docker Image in die GitHub Container Registry pushen kann
    - `DEIN_GITHUB_TOKEN` mit deinem [Personal Access Token](https://github.com/settings/tokens) (Scopes: `read:packages`)
    - `DEIN_GITHUB_USERNAME` mit deinem GitHub Benutzernamen
 
-3. **Umgebungsvariablen für Produktion:**
-   Erstelle eine `.env.prod` Datei auf deinem Server:
-   ```env
-   STRAVA_CLIENT_ID=deine_prod_client_id
-   STRAVA_CLIENT_SECRET=deine_prod_client_secret
-   STRAVA_REDIRECT_URI=https://multi-track-analyzer.messner.click/callback
+3. **Initiales Zertifikat generieren:**
+   ```bash
+   cd /home/mesznera/docker-strava-mt
+   source .env
+   sudo certbot certonly --standalone \
+     -d "$LETSENCRYPT_DOMAIN" \
+     --non-interactive \
+     --agree-tos \
+     --email "$LETSENCRYPT_EMAIL" \
+     --keep-until-expiring
    ```
 
 ## Installation & Usage
@@ -69,53 +73,33 @@ Damit der Workflow das Docker Image in die GitHub Container Registry pushen kann
 
 2. **Configuration:**
     Create a .env file in the root directory and add your credentials:
-    Code-Snippet
 
-    ```
+    ```env
     STRAVA_CLIENT_ID=your_id
     STRAVA_CLIENT_SECRET=your_secret
     STRAVA_REDIRECT_URI=http://localhost:8000/callback
+    LETSENCRYPT_DOMAIN=your.domain.com
+    LETSENCRYPT_EMAIL=your@email.com
     ```
 
 ### Anleitung zum Neubau und Start des Containers
 
-1. **Öffne ein Terminal** im Projektverzeichnis (wo `docker-compose.yml` liegt)
+1. **Öffne ein Terminal** im Projektverzeichnis
 
-2. **Stoppe laufende Container** (falls vorhanden):
+2. **Stoppe laufende Container**:
 ```bash
-docker-compose down
+docker compose -f docker-compose-prod.yml down
 ```
 
-3. **Baue das Image neu**:
+3. **Starte die Produktion**:
 ```bash
-docker-compose build --no-cache
-```
-*Hinweis:* `--no-cache` stellt sicher, dass alle Schritte neu ausgeführt werden
-
-4. **Starte den Container**:
-```bash
-docker-compose up -d
-```
-
-5. **Überprüfe den Status**:
-```bash
-docker-compose ps
-```
-
-6. **Zeige die Logs an** (optional):
-```bash
-docker-compose logs -f
+chmod +x start_prod.sh renew_certs.sh
+./start_prod.sh
 ```
 
 ### Wichtige Hinweise:
-- Stelle sicher, dass die `.env`-Datei mit folgenden Variablen existiert:
-  ```env
-  STRAVA_CLIENT_ID=deine_client_id
-  STRAVA_CLIENT_SECRET=dein_client_secret
-  STRAVA_REDIRECT_URI=http://localhost:8000/callback
-  ```
-- Die App ist nach dem Start erreichbar unter: http://localhost:8000
-- Bei Änderungen am Code musst du den Container neu bauen, da das Volume nur für Entwicklung ohne Build verwendet wird
+- Die App ist nach dem Start erreichbar unter der in `STRAVA_REDIRECT_URI` konfigurierten Domain.
+- Bei Änderungen am Code musst du das Image neu bauen und den Container neu starten.
 
 ## Analyze:
 
