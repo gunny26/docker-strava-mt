@@ -45,11 +45,46 @@ You need to create a Strava API Application at [strava.com/settings/api](https:/
     STRAVA_REDIRECT_URI=http://localhost:8000/callback
     ```
 
-    Start the Container:
-    Bash
-    ```
-    docker-compose up -d --build
-    ```
+### Anleitung zum Neubau und Start des Containers
+
+1. **Öffne ein Terminal** im Projektverzeichnis (wo `docker-compose.yml` liegt)
+
+2. **Stoppe laufende Container** (falls vorhanden):
+```bash
+docker-compose down
+```
+
+3. **Baue das Image neu**:
+```bash
+docker-compose build --no-cache
+```
+*Hinweis:* `--no-cache` stellt sicher, dass alle Schritte neu ausgeführt werden
+
+4. **Starte den Container**:
+```bash
+docker-compose up -d
+```
+
+5. **Überprüfe den Status**:
+```bash
+docker-compose ps
+```
+
+6. **Zeige die Logs an** (optional):
+```bash
+docker-compose logs -f
+```
+
+### Wichtige Hinweise:
+- Stelle sicher, dass die `.env`-Datei mit folgenden Variablen existiert:
+  ```env
+  STRAVA_CLIENT_ID=deine_client_id
+  STRAVA_CLIENT_SECRET=dein_client_secret
+  STRAVA_REDIRECT_URI=http://localhost:8000/callback
+  ```
+- Die App ist nach dem Start erreichbar unter: http://localhost:8000
+- Bei Änderungen am Code musst du den Container neu bauen, da das Volume nur für Entwicklung ohne Build verwendet wird
+
 ## Analyze:
 
 Open http://localhost:8000.
