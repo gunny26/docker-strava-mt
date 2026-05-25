@@ -14,7 +14,6 @@ services:
   haproxy:
     image: haproxy:latest
     ports:
-      - "80:80"
       - "443:443"
     volumes:
       - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
