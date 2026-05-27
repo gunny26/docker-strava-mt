@@ -1,9 +1,14 @@
 import os
+import logging
+import requests
 from typing import Dict, Any
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-import requests
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -45,13 +50,17 @@ async def callback(code: str) -> RedirectResponse:
         'code': code,
         'grant_type': 'authorization_code'
     }
-    # Exchange code for token
-    response = requests.post("https://www.strava.com/oauth/token", data=payload)
-    data: Dict[str, Any] = response.json()
-    access_token: str = data.get("access_token", "")
+    try:
+        response = requests.post("https://www.strava.com/oauth/token", data=payload, timeout=10)
+        response.raise_for_status()
+        data: Dict[str, Any] = response.json()
+        access_token: str = data.get("access_token", "")
+        if not access_token:
+            raise ValueError("Access token missing in response")
+    except Exception as e:
+        logger.error(f"OAuth token exchange failed: {e}")
+        raise HTTPException(status_code=500, detail="Authentication failed")
     
-    # Redirect back to frontend with the token in the URL anchor
-    # Using an anchor (#) prevents the token from being logged on the server side
     return RedirectResponse(url=f"/#access_token={access_token}")
 
 @app.get("/stream/{activity_id}")
@@ -61,9 +70,10 @@ async def get_activity_stream(
 ) -> Dict[str, Any]:
     """Fetch the activity stream data from Strava API."""
     if not authorization or not authorization.startswith("Bearer "):
+        logger.warning("Missing or invalid Authorization header")
         raise HTTPException(
             status_code=401, 
-            detail="Authorization header fehlt oder ist ungültig"
+            detail="Authorization header missing or invalid"
         )
     
     token = authorization.split(" ")[1]
@@ -73,10 +83,12 @@ async def get_activity_stream(
         'keys': 'time,latlng,altitude,velocity_smooth,heartrate,cadence',
         'key_by_type': 'true'
     }
-    response = requests.get(url, headers=headers, params=params)
-    
-    if response.status_code != 200:
-        raise HTTPException(status_code=response.status_code, detail="Stream konnte nicht geladen werden.")
+    try:
+        response = requests.get(url, headers=headers, params=params, timeout=10)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to fetch stream for activity {activity_id}: {e}")
+        raise HTTPException(status_code=502, detail="Could not load activity stream")
         
     return response.json()
 
