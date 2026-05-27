@@ -16,6 +16,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 CLIENT_ID: str = os.getenv("STRAVA_CLIENT_ID", "")
 CLIENT_SECRET: str = os.getenv("STRAVA_CLIENT_SECRET", "")
 REDIRECT_URI: str = os.getenv("STRAVA_REDIRECT_URI", "")
+GIT_COMMIT_HASH: str = os.getenv("GIT_COMMIT_HASH", "unbekannt")
 
 @app.get("/")
 async def read_index() -> FileResponse:
@@ -26,6 +27,11 @@ async def read_index() -> FileResponse:
 async def health_check() -> Dict[str, str]:
     """Health check endpoint for HAProxy."""
     return {"status": "ok"}
+
+@app.get("/version")
+async def get_version() -> Dict[str, str]:
+    """Return current Git commit version."""
+    return {"version": GIT_COMMIT_HASH}
 
 @app.get("/login")
 async def login() -> RedirectResponse:

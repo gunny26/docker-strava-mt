@@ -786,7 +786,27 @@ document.getElementById('globalSlider').oninput = (e) => {
     syncGlobal();
 };
 
+// NEUE Funktion: Lade Version vom Backend
+async function loadVersion() {
+    try {
+        const response = await fetch('/version');
+        if (response.ok) {
+            const data = await response.json();
+            document.getElementById('versionDisplay').textContent = 
+                data.version.substring(0, 7); // Kürze auf 7 Zeichen
+        } else {
+            document.getElementById('versionDisplay').textContent = "unbekannt";
+        }
+    } catch (error) {
+        document.getElementById('versionDisplay').textContent = "Fehler";
+        console.error("Version load error:", error);
+    }
+}
+
 // Initialize
-initTheme();
-initHelpModal();
-loadSavedSetsList();
+document.addEventListener('DOMContentLoaded', () => {
+    initTheme();
+    initHelpModal();
+    loadSavedSetsList();
+    loadVersion();
+});

@@ -8,6 +8,10 @@ WORKDIR /app
 # We will need fastapi and uvicorn for the web server
 RUN pip install --no-cache-dir --only-binary=:all: fastapi uvicorn gpxpy requests
 
+# Füge Build-Argument für Git-Commit-Hash hinzu
+ARG GIT_COMMIT_HASH
+ENV GIT_COMMIT_HASH=$GIT_COMMIT_HASH
+
 # Copy the application code
 COPY . .
 
